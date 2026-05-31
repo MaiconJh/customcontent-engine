@@ -2,6 +2,7 @@ package com.customcontentengine.bootstrap;
 
 import com.customcontentengine.adapter.bukkit.BlockBreakAdapter;
 import com.customcontentengine.adapter.bukkit.BlockPlaceAdapter;
+import com.customcontentengine.adapter.bukkit.BukkitItemMetadataAdapter;
 import com.customcontentengine.adapter.bukkit.ItemCommandAdapter;
 import com.customcontentengine.adapter.persistence.PdcBlockCodec;
 import com.customcontentengine.adapter.persistence.PdcBlockStore;
@@ -14,6 +15,7 @@ import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.port.DropPort;
 import com.customcontentengine.port.WorldMutationPort;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class CustomContentPlugin extends JavaPlugin {
@@ -28,7 +30,7 @@ public final class CustomContentPlugin extends JavaPlugin {
         WorldMutationPort worldMutation = (position, materialBase) -> { };
         DropPort dropPort = (position, drops) -> { };
         BlockService blockService = new BlockService(registry, scheduler, blockStore, worldMutation, dropPort);
-        ItemService itemService = new ItemService(registry);
+        ItemService<ItemStack> itemService = new ItemService<>(registry, new BukkitItemMetadataAdapter(this));
 
         getServer().getPluginManager().registerEvents(new BlockBreakAdapter(blockService), this);
         getServer().getPluginManager().registerEvents(new BlockPlaceAdapter(blockService), this);
