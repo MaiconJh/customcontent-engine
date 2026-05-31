@@ -1,0 +1,9 @@
+name: CustomContentEngine
+main: com.customcontentengine.bootstrap.CustomContentPlugin
+version: 0.1.0-SNAPSHOT
+api-version: "1.21"
+author: CustomContent Engine
+commands:
+  givecustomitem:
+    description: Debug command to give a custom item.
+    usage: /givecustomitem <id>
