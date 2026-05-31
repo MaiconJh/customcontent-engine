@@ -14,8 +14,8 @@ public record ItemDef(
         if (materialBase == null || materialBase.isBlank()) {
             throw new IllegalArgumentException("materialBase must not be blank");
         }
-        if (customModelData < 0) {
-            throw new IllegalArgumentException("customModelData must not be negative");
+        if (customModelData <= 0) {
+            throw new IllegalArgumentException("customModelData must be positive");
         }
         attributes = Objects.requireNonNull(attributes, "attributes");
     }

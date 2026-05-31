@@ -19,8 +19,8 @@ public record BlockDef(
         if (materialBase == null || materialBase.isBlank()) {
             throw new IllegalArgumentException("materialBase must not be blank");
         }
-        if (customModelData < 0) {
-            throw new IllegalArgumentException("customModelData must not be negative");
+        if (customModelData <= 0) {
+            throw new IllegalArgumentException("customModelData must be positive");
         }
         if (requiredTool == null || requiredTool.isBlank()) {
             throw new IllegalArgumentException("requiredTool must not be blank");

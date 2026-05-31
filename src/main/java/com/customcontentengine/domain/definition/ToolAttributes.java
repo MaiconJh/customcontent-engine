@@ -8,8 +8,8 @@ public record ToolAttributes(double damage, double speed, int durability) {
         if (speed < 0.0) {
             throw new IllegalArgumentException("speed must not be negative");
         }
-        if (durability < 0) {
-            throw new IllegalArgumentException("durability must not be negative");
+        if (durability <= 0) {
+            throw new IllegalArgumentException("durability must be positive");
         }
     }
 }
