@@ -30,10 +30,11 @@ public final class CustomContentPlugin extends JavaPlugin {
         WorldMutationPort worldMutation = (position, materialBase) -> { };
         DropPort dropPort = (position, drops) -> { };
         BlockService blockService = new BlockService(registry, scheduler, blockStore, worldMutation, dropPort);
-        ItemService<ItemStack> itemService = new ItemService<>(registry, new BukkitItemMetadataAdapter(this));
+        BukkitItemMetadataAdapter itemMetadata = new BukkitItemMetadataAdapter(this);
+        ItemService<ItemStack> itemService = new ItemService<>(registry, itemMetadata);
 
         getServer().getPluginManager().registerEvents(new BlockBreakAdapter(blockService), this);
-        getServer().getPluginManager().registerEvents(new BlockPlaceAdapter(blockService), this);
+        getServer().getPluginManager().registerEvents(new BlockPlaceAdapter(blockService, itemMetadata), this);
 
         PluginCommand command = getCommand("givecustomitem");
         if (command != null) {

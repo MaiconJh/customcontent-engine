@@ -23,6 +23,19 @@ public final class PdcBlockCodec {
         return buffer.array();
     }
 
+    public short packRelativePosition(int relativeX, int y, int relativeZ) {
+        if (relativeX < 0 || relativeX > 15) {
+            throw new IllegalArgumentException("relativeX must be between 0 and 15");
+        }
+        if (relativeZ < 0 || relativeZ > 15) {
+            throw new IllegalArgumentException("relativeZ must be between 0 and 15");
+        }
+        if (y < 0 || y > 255) {
+            throw new IllegalArgumentException("y must be between 0 and 255 for the current PDC block codec");
+        }
+        return (short) ((y << 8) | (relativeZ << 4) | relativeX);
+    }
+
     public DecodedPdcBlocks decode(byte[] data) {
         if (data == null || data.length == 0) {
             return new DecodedPdcBlocks(SCHEMA_VERSION, List.of());

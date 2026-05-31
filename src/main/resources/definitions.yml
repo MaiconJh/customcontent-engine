@@ -11,6 +11,14 @@ blocks:
         amount: 1
 
 items:
+  ruby_ore:
+    material_base: NOTE_BLOCK
+    custom_model_data: 1001
+    attributes:
+      damage: 0.0
+      speed: 1.0
+      durability: 1
+
   ruby_pickaxe:
     material_base: DIAMOND_PICKAXE
     custom_model_data: 2001
