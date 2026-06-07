@@ -7,6 +7,7 @@ import com.customcontentengine.adapter.bukkit.BukkitDropAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitItemMetadataAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitWorldMutationAdapter;
 import com.customcontentengine.adapter.bukkit.ItemCommandAdapter;
+import com.customcontentengine.adapter.bukkit.MiningInputAdapter;
 import com.customcontentengine.adapter.platform.PaperRegionSafetyAdapter;
 import com.customcontentengine.adapter.platform.PaperSchedulerAdapter;
 import com.customcontentengine.adapter.persistence.PdcBlockCodec;
@@ -20,7 +21,10 @@ import com.customcontentengine.application.mechanic.AreaBreakRuntimeService;
 import com.customcontentengine.application.mechanic.MechanicBindingValidator;
 import com.customcontentengine.application.mechanic.MechanicRegistry;
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
+import com.customcontentengine.application.mining.InMemoryMiningSessionRepository;
+import com.customcontentengine.application.mining.MiningSessionService;
 import com.customcontentengine.builtin.mechanic.AreaBreakMechanic;
+import com.customcontentengine.domain.mining.MiningDurationPolicy;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import java.util.List;
 import org.bukkit.command.PluginCommand;
@@ -60,10 +64,16 @@ public final class CustomContentPlugin extends JavaPlugin {
                 registry.mechanicBindings(),
                 AreaBreakMechanic.ID,
                 areaBreakRuntime);
+        MiningSessionService miningSessionService = new MiningSessionService(
+                new InMemoryMiningSessionRepository(),
+                MiningDurationPolicy.DEFAULT);
 
         getServer().getPluginManager().registerEvents(new BlockPlaceAdapter(blockService, itemMetadata), this);
         getServer().getPluginManager().registerEvents(
                 new BlockBreakAdapter(blockService, itemMetadata, areaBreakEventTrigger),
+                this);
+        getServer().getPluginManager().registerEvents(
+                new MiningInputAdapter(registry, blockStore, itemMetadata, miningSessionService),
                 this);
 
         PluginCommand command = getCommand("givecustomitem");
