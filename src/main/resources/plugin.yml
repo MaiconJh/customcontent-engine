@@ -7,3 +7,6 @@ commands:
   givecustomitem:
     description: Debug command to give a custom item.
     usage: /givecustomitem <id>
+  debugareabreak:
+    description: Internal debug command to execute area_break against the targeted block.
+    usage: /debugareabreak

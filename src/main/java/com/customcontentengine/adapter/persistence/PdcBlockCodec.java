@@ -1,7 +1,9 @@
 package com.customcontentengine.adapter.persistence;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public final class PdcBlockCodec {
     public static final byte SCHEMA_VERSION = 1;
@@ -55,6 +57,24 @@ public final class PdcBlockCodec {
             entries.add(new PdcBlockEntry(buffer.getShort(), buffer.getShort()));
         }
         return new DecodedPdcBlocks(schemaVersion, entries);
+    }
+
+    public Optional<Short> findNumericId(byte[] data, short packedPosition) {
+        return decode(data).entries().stream()
+                .filter(entry -> entry.packedPosition() == packedPosition)
+                .map(PdcBlockEntry::numericId)
+                .findFirst();
+    }
+
+    public byte[] remove(byte[] data, short packedPosition) {
+        List<PdcBlockEntry> entries = decode(data).entries();
+        ArrayList<PdcBlockEntry> remaining = new ArrayList<>(entries.size());
+        for (PdcBlockEntry entry : entries) {
+            if (entry.packedPosition() != packedPosition) {
+                remaining.add(entry);
+            }
+        }
+        return encode(remaining);
     }
 
     public record PdcBlockEntry(short packedPosition, short numericId) {

@@ -13,8 +13,6 @@ import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.DropPort;
-import com.customcontentengine.port.SchedulerPort;
-import com.customcontentengine.port.WorldMutationPort;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -75,11 +73,78 @@ class BlockServiceTest {
         assertTrue(result.message().contains("Could not store custom block ruby_ore"));
     }
 
+    @Test
+    void returnsNotCustomBlockWhenBreakPositionHasNoStoredIdentity() {
+        FakeBlockStore blockStore = new FakeBlockStore();
+        FakeDropPort dropPort = new FakeDropPort();
+        BlockService service = service(
+                new DefinitionRegistry(List.of(block("ruby_ore", (short) 1)), List.of(item("ruby_ore"))),
+                blockStore,
+                dropPort);
+
+        BlockService.BreakBlockResult result = service.handleBreak(new WorldPosition("world", 10, 64, 12));
+
+        assertEquals(BlockService.BreakBlockStatus.NOT_CUSTOM_BLOCK, result.status());
+        assertTrue(blockStore.removedPosition.isEmpty());
+        assertTrue(dropPort.droppedPosition.isEmpty());
+    }
+
+    @Test
+    void removesIdentityAndDropsConfiguredDropsWhenBreakingKnownCustomBlock() {
+        FakeBlockStore blockStore = new FakeBlockStore();
+        FakeDropPort dropPort = new FakeDropPort();
+        WorldPosition position = new WorldPosition("world", 10, 64, 12);
+        blockStore.numericId = Optional.of((short) 1);
+        BlockService service = service(
+                new DefinitionRegistry(List.of(block("ruby_ore", (short) 1)), List.of(item("ruby_ore"))),
+                blockStore,
+                dropPort);
+
+        BlockService.BreakBlockResult result = service.handleBreak(position);
+
+        assertEquals(BlockService.BreakBlockStatus.CUSTOM_BLOCK_BROKEN, result.status());
+        assertEquals(Optional.of(position), blockStore.removedPosition);
+        assertEquals(Optional.of(position), dropPort.droppedPosition);
+        assertEquals("ruby", dropPort.droppedTable.orElseThrow().entries().getFirst().item());
+    }
+
+    @Test
+    void removesOrphanIdentityWithoutDroppingCustomDrops() {
+        FakeBlockStore blockStore = new FakeBlockStore();
+        FakeDropPort dropPort = new FakeDropPort();
+        WorldPosition position = new WorldPosition("world", 10, 64, 12);
+        blockStore.numericId = Optional.of((short) 99);
+        BlockService service = service(
+                new DefinitionRegistry(List.of(block("ruby_ore", (short) 1)), List.of(item("ruby_ore"))),
+                blockStore,
+                dropPort);
+
+        BlockService.BreakBlockResult result = service.handleBreak(position);
+
+        assertEquals(BlockService.BreakBlockStatus.ORPHAN_BLOCK_REMOVED, result.status());
+        assertEquals(Optional.of(position), blockStore.removedPosition);
+        assertTrue(dropPort.droppedPosition.isEmpty());
+    }
+
+    @Test
+    void reportsStoreFailureWhenBreakLookupFails() {
+        FakeBlockStore blockStore = new FakeBlockStore();
+        blockStore.failFind = true;
+        BlockService service = service(
+                new DefinitionRegistry(List.of(block("ruby_ore", (short) 1)), List.of(item("ruby_ore"))),
+                blockStore);
+
+        BlockService.BreakBlockResult result = service.handleBreak(new WorldPosition("world", 10, 64, 12));
+
+        assertEquals(BlockService.BreakBlockStatus.STORE_FAILED, result.status());
+    }
+
     private BlockService service(DefinitionRegistry registry, BlockStorePort blockStore) {
-        SchedulerPort scheduler = (position, task) -> task.run();
-        WorldMutationPort worldMutation = (position, materialBase) -> { };
-        DropPort dropPort = (position, drops) -> { };
-        return new BlockService(registry, scheduler, blockStore, worldMutation, dropPort);
+        return service(registry, blockStore, new FakeDropPort());
+    }
+
+    private BlockService service(DefinitionRegistry registry, BlockStorePort blockStore, DropPort dropPort) {
+        return new BlockService(registry, blockStore, dropPort);
     }
 
     private BlockDef block(String id, short numericId) {
@@ -99,11 +164,17 @@ class BlockServiceTest {
     private static final class FakeBlockStore implements BlockStorePort {
         private WorldPosition storedPosition;
         private short storedNumericId;
+        private Optional<Short> numericId = Optional.empty();
+        private Optional<WorldPosition> removedPosition = Optional.empty();
+        private boolean failFind;
         private boolean failPut;
 
         @Override
         public Optional<Short> findNumericId(WorldPosition position) {
-            return Optional.empty();
+            if (failFind) {
+                throw new IllegalStateException("store unavailable");
+            }
+            return numericId;
         }
 
         @Override
@@ -117,6 +188,18 @@ class BlockServiceTest {
 
         @Override
         public void remove(WorldPosition position) {
+            removedPosition = Optional.of(position);
+        }
+    }
+
+    private static final class FakeDropPort implements DropPort {
+        private Optional<WorldPosition> droppedPosition = Optional.empty();
+        private Optional<DropTable> droppedTable = Optional.empty();
+
+        @Override
+        public void drop(WorldPosition position, DropTable drops) {
+            droppedPosition = Optional.of(position);
+            droppedTable = Optional.of(drops);
         }
     }
 }

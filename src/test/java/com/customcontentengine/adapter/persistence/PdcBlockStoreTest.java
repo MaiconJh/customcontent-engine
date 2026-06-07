@@ -87,4 +87,29 @@ class PdcBlockStoreTest {
 
         assertTrue(store.findNumericId(new WorldPosition("world", 11, 64, 12)).isEmpty());
     }
+
+    @Test
+    void removesBlockEntryAtRelativePosition() {
+        PdcBlockCodec codec = new PdcBlockCodec();
+        Chunk chunk = mock(Chunk.class);
+        PersistentDataContainer container = mock(PersistentDataContainer.class);
+        when(chunk.getPersistentDataContainer()).thenReturn(container);
+        short removedPosition = codec.packRelativePosition(10, 64, 12);
+        short remainingPosition = codec.packRelativePosition(11, 64, 12);
+        when(container.get(KEY, PersistentDataType.BYTE_ARRAY)).thenReturn(codec.encode(List.of(
+                new PdcBlockCodec.PdcBlockEntry(removedPosition, (short) 7),
+                new PdcBlockCodec.PdcBlockEntry(remainingPosition, (short) 8))));
+        PdcBlockStore store = new PdcBlockStore(codec, KEY, position -> chunk);
+
+        store.remove(new WorldPosition("world", 10, 64, 12));
+
+        ArgumentCaptor<byte[]> dataCaptor = ArgumentCaptor.forClass(byte[].class);
+        verify(container).set(
+                org.mockito.ArgumentMatchers.eq(KEY),
+                org.mockito.ArgumentMatchers.eq(PersistentDataType.BYTE_ARRAY),
+                dataCaptor.capture());
+        assertEquals(
+                List.of(new PdcBlockCodec.PdcBlockEntry(remainingPosition, (short) 8)),
+                codec.decode(dataCaptor.getValue()).entries());
+    }
 }

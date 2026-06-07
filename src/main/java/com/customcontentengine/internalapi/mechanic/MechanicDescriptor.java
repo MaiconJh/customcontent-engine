@@ -1,12 +1,11 @@
 package com.customcontentengine.internalapi.mechanic;
 
+import java.util.Objects;
 import java.util.Set;
 
-public record MechanicDescriptor(String key, Set<Capability> capabilities) {
+public record MechanicDescriptor(MechanicId id, Set<Capability> requiredCapabilities, boolean readOnly) {
     public MechanicDescriptor {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException("key must not be blank");
-        }
-        capabilities = Set.copyOf(capabilities == null ? Set.of() : capabilities);
+        Objects.requireNonNull(id, "id");
+        requiredCapabilities = Set.copyOf(requiredCapabilities == null ? Set.of() : requiredCapabilities);
     }
 }

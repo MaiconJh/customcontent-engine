@@ -39,11 +39,7 @@ public final class PdcBlockStore implements BlockStorePort {
         byte[] data = chunkResolver.apply(position)
                 .getPersistentDataContainer()
                 .get(storageKey, PersistentDataType.BYTE_ARRAY);
-        short packedPosition = packedPosition(position);
-        return codec.decode(data).entries().stream()
-                .filter(entry -> entry.packedPosition() == packedPosition)
-                .map(PdcBlockCodec.PdcBlockEntry::numericId)
-                .findFirst();
+        return codec.findNumericId(data, packedPosition(position));
     }
 
     @Override
@@ -77,7 +73,12 @@ public final class PdcBlockStore implements BlockStorePort {
 
     @Override
     public void remove(WorldPosition position) {
-        // Removing custom block identity is intentionally deferred until custom block breaking is in scope.
+        Objects.requireNonNull(position, "position");
+        Chunk chunk = chunkResolver.apply(position);
+        PersistentDataContainer container = chunk.getPersistentDataContainer();
+        byte[] existingData = container.get(storageKey, PersistentDataType.BYTE_ARRAY);
+        byte[] updatedData = codec.remove(existingData, packedPosition(position));
+        container.set(storageKey, PersistentDataType.BYTE_ARRAY, updatedData);
     }
 
     public PdcBlockCodec codec() {

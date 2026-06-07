@@ -20,7 +20,7 @@ public final class BlockPlaceAdapter implements Listener {
         this.itemMetadata = Objects.requireNonNull(itemMetadata, "itemMetadata");
     }
 
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
         itemMetadata.readCustomItemIdentity(event.getItemInHand())
                 .ifPresent(itemId -> blockService.handlePlace(
