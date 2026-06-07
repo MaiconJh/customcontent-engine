@@ -376,3 +376,14 @@ Phase 1 implements only the pure definition model and optional YAML fields:
 This phase does not implement runtime mining sessions, `BlockDamageEvent`, visual progress, custom break timing, scheduler drivers, or changes to the current block break flow.
 
 `schema` remains `1` because the new `mining` sections are optional and backward compatible.
+
+## 16. Phase 2 Implementation Note
+
+Phase 2 implements only pure mining calculation and session state:
+
+- expected duration from `MiningHardness` and `MiningSpeed`;
+- absolute-time progress clamped between `0.0` and `1.0`;
+- pure visual stage calculation;
+- immutable session identity and timing state.
+
+This phase does not implement active session storage, event adapters, visual adapters, scheduler drivers, custom break timing, world mutation, drops, or `on_block_break` runtime integration.
