@@ -7,6 +7,8 @@ import com.customcontentengine.domain.definition.ToolAttributes;
 import com.customcontentengine.domain.mechanic.MechanicBinding;
 import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
 import com.customcontentengine.domain.mechanic.MechanicTrigger;
+import com.customcontentengine.domain.mining.MiningHardness;
+import com.customcontentengine.domain.mining.MiningSpeed;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
@@ -15,6 +17,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -55,7 +58,8 @@ public final class YamlDefinitionLoader {
                     section.getString("material_base"),
                     section.getInt("custom_model_data"),
                     section.getString("required_tool"),
-                    new DropTable(loadDrops(id, section.getMapList("drops")))
+                    new DropTable(loadDrops(id, section.getMapList("drops"))),
+                    loadMiningHardness(section)
             ));
         }
         return blocks;
@@ -87,10 +91,25 @@ public final class YamlDefinitionLoader {
                             attributes.getDouble("damage"),
                             attributes.getDouble("speed"),
                             attributes.getInt("durability")
-                    )
+                    ),
+                    loadMiningSpeed(section)
             ));
         }
         return items;
+    }
+
+    private Optional<MiningHardness> loadMiningHardness(ConfigurationSection section) {
+        if (!section.contains("mining")) {
+            return Optional.empty();
+        }
+        return Optional.of(new MiningHardness(section.getConfigurationSection("mining").getDouble("hardness")));
+    }
+
+    private Optional<MiningSpeed> loadMiningSpeed(ConfigurationSection section) {
+        if (!section.contains("mining")) {
+            return Optional.empty();
+        }
+        return Optional.of(new MiningSpeed(section.getConfigurationSection("mining").getDouble("speed")));
     }
 
     private MechanicBindingRegistry loadMechanicBindings(ConfigurationSection itemsSection) {

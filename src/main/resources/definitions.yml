@@ -6,6 +6,8 @@ blocks:
     material_base: NOTE_BLOCK
     custom_model_data: 1001
     required_tool: ruby_pickaxe
+    mining:
+      hardness: 6.0
     drops:
       - item: ruby
         amount: 1
@@ -34,6 +36,8 @@ items:
       damage: 5.0
       speed: 1.2
       durability: 500
+    mining:
+      speed: 8.0
     mechanics:
       on_block_break:
         - area_break

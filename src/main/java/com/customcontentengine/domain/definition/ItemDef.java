@@ -1,14 +1,25 @@
 package com.customcontentengine.domain.definition;
 
+import com.customcontentengine.domain.mining.MiningSpeed;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import java.util.Objects;
+import java.util.Optional;
 
 public record ItemDef(
         CustomItemId id,
         String materialBase,
         int customModelData,
-        ToolAttributes attributes
+        ToolAttributes attributes,
+        Optional<MiningSpeed> miningSpeed
 ) {
+    public ItemDef(
+            CustomItemId id,
+            String materialBase,
+            int customModelData,
+            ToolAttributes attributes) {
+        this(id, materialBase, customModelData, attributes, Optional.empty());
+    }
+
     public ItemDef {
         Objects.requireNonNull(id, "id");
         if (materialBase == null || materialBase.isBlank()) {
@@ -18,5 +29,6 @@ public record ItemDef(
             throw new IllegalArgumentException("customModelData must be positive");
         }
         attributes = Objects.requireNonNull(attributes, "attributes");
+        miningSpeed = Objects.requireNonNull(miningSpeed, "miningSpeed");
     }
 }

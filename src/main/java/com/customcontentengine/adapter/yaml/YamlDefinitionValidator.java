@@ -33,6 +33,14 @@ public final class YamlDefinitionValidator {
         if (section.getMapList("drops").isEmpty()) {
             throw error("blocks." + id + ".drops must contain at least one drop");
         }
+        if (section.contains("mining")) {
+            ConfigurationSection mining = requireSection(section, "blocks." + id + ".mining", "mining");
+            requireNumber(mining, "blocks." + id + ".mining.hardness", "hardness");
+            double hardness = mining.getDouble("hardness");
+            if (hardness <= 0.0D) {
+                throw error("blocks." + id + ".mining.hardness must be greater than zero but was " + hardness);
+            }
+        }
     }
 
     public void validateDrop(String blockId, int index, Object item, Object amount) {
@@ -56,6 +64,14 @@ public final class YamlDefinitionValidator {
         requireNumber(attributes, "items." + id + ".attributes.damage", "damage");
         requireNumber(attributes, "items." + id + ".attributes.speed", "speed");
         requirePositiveInt(attributes, "items." + id + ".attributes.durability", "durability");
+        if (section.contains("mining")) {
+            ConfigurationSection mining = requireSection(section, "items." + id + ".mining", "mining");
+            requireNumber(mining, "items." + id + ".mining.speed", "speed");
+            double speed = mining.getDouble("speed");
+            if (speed <= 0.0D) {
+                throw error("items." + id + ".mining.speed must be greater than zero but was " + speed);
+            }
+        }
         if (section.contains("mechanics")) {
             ConfigurationSection mechanics = requireSection(section, "items." + id + ".mechanics", "mechanics");
             for (String trigger : mechanics.getKeys(false)) {

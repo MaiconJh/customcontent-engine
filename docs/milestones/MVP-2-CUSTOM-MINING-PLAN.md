@@ -365,3 +365,14 @@ rg '^import org\.bukkit|^import io\.papermc|^import org\.spigot' src/main/java/c
 rg '^import com\.customcontentengine\.adapter' src/main/java/com/customcontentengine/application
 rg 'net\.minecraft|reflection|Reflect|ServiceLoader' src/main/java src/test/java
 ```
+
+## 15. Phase 1 Implementation Note
+
+Phase 1 implements only the pure definition model and optional YAML fields:
+
+- `blocks.<id>.mining.hardness`;
+- `items.<id>.mining.speed`.
+
+This phase does not implement runtime mining sessions, `BlockDamageEvent`, visual progress, custom break timing, scheduler drivers, or changes to the current block break flow.
+
+`schema` remains `1` because the new `mining` sections are optional and backward compatible.

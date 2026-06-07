@@ -42,6 +42,32 @@ class YamlDefinitionLoaderTest {
     }
 
     @Test
+    void loadsYamlWithoutMining() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYaml()).toFile());
+
+        assertTrue(registry.findBlock(new CustomBlockId("ruby_ore")).orElseThrow().miningHardness().isEmpty());
+        assertTrue(registry.findItem(new CustomItemId("ruby_pickaxe")).orElseThrow().miningSpeed().isEmpty());
+    }
+
+    @Test
+    void loadsBlockMiningHardness() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMining()).toFile());
+
+        assertEquals(
+                6.0D,
+                registry.findBlock(new CustomBlockId("ruby_ore")).orElseThrow().miningHardness().orElseThrow().value());
+    }
+
+    @Test
+    void loadsItemMiningSpeed() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMining()).toFile());
+
+        assertEquals(
+                8.0D,
+                registry.findItem(new CustomItemId("ruby_pickaxe")).orElseThrow().miningSpeed().orElseThrow().value());
+    }
+
+    @Test
     void loadsOnBlockBreakMechanicBinding() throws IOException {
         DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMechanics()).toFile());
 
@@ -106,6 +132,58 @@ class YamlDefinitionLoaderTest {
     @Test
     void rejectsDropAmountLessThanOne() throws IOException {
         assertInvalid(validYaml().replace("amount: 1", "amount: 0"), "drops[0].amount must be greater than zero but was 0");
+    }
+
+    @Test
+    void rejectsNegativeBlockMiningHardness() throws IOException {
+        assertInvalid(
+                validYamlWithMining().replace("hardness: 6.0", "hardness: -1.0"),
+                "blocks.ruby_ore.mining.hardness must be greater than zero but was -1.0");
+    }
+
+    @Test
+    void rejectsZeroBlockMiningHardness() throws IOException {
+        assertInvalid(
+                validYamlWithMining().replace("hardness: 6.0", "hardness: 0.0"),
+                "blocks.ruby_ore.mining.hardness must be greater than zero but was 0.0");
+    }
+
+    @Test
+    void rejectsZeroItemMiningSpeed() throws IOException {
+        assertInvalid(
+                validYamlWithMining().replace("speed: 8.0", "speed: 0.0"),
+                "items.ruby_pickaxe.mining.speed must be greater than zero but was 0.0");
+    }
+
+    @Test
+    void rejectsNegativeItemMiningSpeed() throws IOException {
+        assertInvalid(
+                validYamlWithMining().replace("speed: 8.0", "speed: -1.0"),
+                "items.ruby_pickaxe.mining.speed must be greater than zero but was -1.0");
+    }
+
+    @Test
+    void rejectsBlockMiningThatIsNotASection() throws IOException {
+        assertInvalid(
+                validYamlWithMining().replace("""
+                    mining:
+                      hardness: 6.0
+                """, """
+                    mining: 6.0
+                """),
+                "blocks.ruby_ore.mining must be a YAML section");
+    }
+
+    @Test
+    void rejectsItemMiningThatIsNotASection() throws IOException {
+        assertInvalid(
+                validYamlWithMining().replace("""
+                    mining:
+                      speed: 8.0
+                """, """
+                    mining: 8.0
+                """),
+                "items.ruby_pickaxe.mining must be a YAML section");
     }
 
     @Test
@@ -194,6 +272,13 @@ class YamlDefinitionLoaderTest {
                 "blocks.ruby_ore.material_base must be a non-empty string");
     }
 
+    @Test
+    void keepsSchemaOneWithMiningFields() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMining()).toFile());
+
+        assertTrue(registry.findBlock(new CustomBlockId("ruby_ore")).isPresent());
+    }
+
     private void assertInvalid(String yaml, String expectedMessagePart) throws IOException {
         YamlDefinitionException exception = assertThrows(YamlDefinitionException.class, () -> loader().load(writeYaml(yaml).toFile()));
         assertTrue(exception.getMessage().contains(expectedMessagePart), () -> "Expected message to contain <" + expectedMessagePart + "> but was <" + exception.getMessage() + ">");
@@ -255,6 +340,33 @@ class YamlDefinitionLoaderTest {
                     mechanics:
                       on_block_break:
                         - area_break
+                """;
+    }
+
+    private String validYamlWithMining() {
+        return """
+                schema: 1
+                blocks:
+                  ruby_ore:
+                    numeric_id: 1
+                    material_base: NOTE_BLOCK
+                    custom_model_data: 1001
+                    required_tool: ruby_pickaxe
+                    mining:
+                      hardness: 6.0
+                    drops:
+                      - item: ruby
+                        amount: 1
+                items:
+                  ruby_pickaxe:
+                    material_base: DIAMOND_PICKAXE
+                    custom_model_data: 2001
+                    attributes:
+                      damage: 5.0
+                      speed: 1.2
+                      durability: 500
+                    mining:
+                      speed: 8.0
                 """;
     }
 }

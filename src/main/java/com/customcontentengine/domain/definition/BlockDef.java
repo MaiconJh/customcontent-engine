@@ -1,7 +1,9 @@
 package com.customcontentengine.domain.definition;
 
+import com.customcontentengine.domain.mining.MiningHardness;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import java.util.Objects;
+import java.util.Optional;
 
 public record BlockDef(
         CustomBlockId id,
@@ -9,8 +11,19 @@ public record BlockDef(
         String materialBase,
         int customModelData,
         String requiredTool,
-        DropTable drops
+        DropTable drops,
+        Optional<MiningHardness> miningHardness
 ) {
+    public BlockDef(
+            CustomBlockId id,
+            short numericId,
+            String materialBase,
+            int customModelData,
+            String requiredTool,
+            DropTable drops) {
+        this(id, numericId, materialBase, customModelData, requiredTool, drops, Optional.empty());
+    }
+
     public BlockDef {
         Objects.requireNonNull(id, "id");
         if (numericId <= 0) {
@@ -26,5 +39,6 @@ public record BlockDef(
             throw new IllegalArgumentException("requiredTool must not be blank");
         }
         drops = Objects.requireNonNull(drops, "drops");
+        miningHardness = Objects.requireNonNull(miningHardness, "miningHardness");
     }
 }
