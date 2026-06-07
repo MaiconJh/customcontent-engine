@@ -19,8 +19,12 @@ import com.customcontentengine.internalapi.mechanic.capability.DropSink;
 import com.customcontentengine.internalapi.mechanic.capability.ExecutionOrigin;
 import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.DropPort;
+import com.customcontentengine.port.RegionSafetyPort;
 import com.customcontentengine.port.SchedulerPort;
 import com.customcontentengine.port.WorldMutationPort;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -38,6 +42,7 @@ public final class AreaBreakRuntimeService {
     private final WorldMutationPort worldMutation;
     private final InMemoryCooldowns cooldowns;
     private final SchedulerPort schedulerPort;
+    private final RegionSafetyPort regionSafety;
 
     public AreaBreakRuntimeService(
             MechanicRegistry mechanicRegistry,
@@ -48,6 +53,28 @@ public final class AreaBreakRuntimeService {
             WorldMutationPort worldMutation,
             InMemoryCooldowns cooldowns,
             SchedulerPort schedulerPort) {
+        this(
+                mechanicRegistry,
+                mechanicId,
+                definitions,
+                blockStore,
+                dropPort,
+                worldMutation,
+                cooldowns,
+                schedulerPort,
+                position -> true);
+    }
+
+    public AreaBreakRuntimeService(
+            MechanicRegistry mechanicRegistry,
+            MechanicId mechanicId,
+            DefinitionRegistry definitions,
+            BlockStorePort blockStore,
+            DropPort dropPort,
+            WorldMutationPort worldMutation,
+            InMemoryCooldowns cooldowns,
+            SchedulerPort schedulerPort,
+            RegionSafetyPort regionSafety) {
         this.mechanicRegistry = Objects.requireNonNull(mechanicRegistry, "mechanicRegistry");
         this.mechanicId = Objects.requireNonNull(mechanicId, "mechanicId");
         this.definitions = Objects.requireNonNull(definitions, "definitions");
@@ -56,6 +83,7 @@ public final class AreaBreakRuntimeService {
         this.worldMutation = Objects.requireNonNull(worldMutation, "worldMutation");
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.schedulerPort = Objects.requireNonNull(schedulerPort, "schedulerPort");
+        this.regionSafety = Objects.requireNonNull(regionSafety, "regionSafety");
     }
 
     public MechanicResult execute(WorldPosition origin, String actorKey) {
@@ -74,54 +102,60 @@ public final class AreaBreakRuntimeService {
             throw new IllegalArgumentException("actorKey must not be blank");
         }
 
-        MechanicContextFactory contextFactory = contextFactory(origin, actorKey, true, excluded);
-        return new MechanicExecutor(
+        RegionSafetyTracker safetyTracker = new RegionSafetyTracker(regionSafety);
+        MechanicContextFactory contextFactory = contextFactory(origin, actorKey, true, excluded, safetyTracker);
+        MechanicResult result = new MechanicExecutor(
                 mechanicRegistry,
                 contextFactory,
                 schedulerPort,
-                anchor -> contextFactory(anchor, actorKey, false, excluded),
+                anchor -> contextFactory(anchor, actorKey, false, excluded, new RegionSafetyTracker(regionSafety)),
                 8)
                 .execute(mechanicId);
+        return safetyTracker.apply(result);
     }
 
     private MechanicContextFactory contextFactory(
             WorldPosition origin,
             String actorKey,
             boolean initialExecution,
-            Set<WorldPosition> excludedPositions) {
+            Set<WorldPosition> excludedPositions,
+            RegionSafetyTracker safetyTracker) {
         return new MechanicContextFactory(Map.of(
-                BlockQuery.class, blockQuery(excludedPositions),
-                BlockMutation.class, blockMutation(excludedPositions),
+                BlockQuery.class, blockQuery(excludedPositions, safetyTracker),
+                BlockMutation.class, blockMutation(excludedPositions, safetyTracker),
                 BudgetView.class, new WorkBudgetView(new WorkBudget(AREA_BREAK_BUDGET)),
                 CooldownView.class, cooldownView(actorKey, initialExecution),
-                DropSink.class, dropSink(excludedPositions),
+                DropSink.class, dropSink(excludedPositions, safetyTracker),
                 ExecutionOrigin.class, new StaticExecutionOrigin(origin)
         ));
     }
 
-    private BlockQuery blockQuery(Set<WorldPosition> excludedPositions) {
+    private BlockQuery blockQuery(Set<WorldPosition> excludedPositions, RegionSafetyTracker safetyTracker) {
         BlockQuery delegate = new StoredBlockQuery(blockStore);
         return position -> {
             if (excludedPositions.contains(position)) {
+                return Optional.empty();
+            }
+            if (!safetyTracker.canAccess(position)) {
                 return Optional.empty();
             }
             return delegate.findCustomBlockNumericId(position);
         };
     }
 
-    private BlockMutation blockMutation(Set<WorldPosition> excludedPositions) {
-        BlockMutation delegate = new StoredBlockMutation(blockStore, worldMutation);
+    private BlockMutation blockMutation(Set<WorldPosition> excludedPositions, RegionSafetyTracker safetyTracker) {
+        BlockMutation delegate = new StoredBlockMutation(blockStore, worldMutation, safetyTracker::canAccess);
         return position -> {
-            if (!excludedPositions.contains(position)) {
+            if (!excludedPositions.contains(position) && safetyTracker.canAccess(position)) {
                 delegate.breakBlock(position);
             }
         };
     }
 
-    private DropSink dropSink(Set<WorldPosition> excludedPositions) {
+    private DropSink dropSink(Set<WorldPosition> excludedPositions, RegionSafetyTracker safetyTracker) {
         DropSink delegate = new DefinitionDropSink(definitions, dropPort);
         return (position, numericId) -> {
-            if (!excludedPositions.contains(position)) {
+            if (!excludedPositions.contains(position) && safetyTracker.canAccess(position)) {
                 delegate.dropFor(position, numericId);
             }
         };
@@ -132,5 +166,37 @@ public final class AreaBreakRuntimeService {
             return cooldowns.view(actorKey + ":" + mechanicId.value(), COOLDOWN_MILLIS);
         }
         return () -> true;
+    }
+
+    private static final class RegionSafetyTracker {
+        private final RegionSafetyPort regionSafety;
+        private final LinkedHashSet<WorldPosition> unsafePositions = new LinkedHashSet<>();
+
+        private RegionSafetyTracker(RegionSafetyPort regionSafety) {
+            this.regionSafety = Objects.requireNonNull(regionSafety, "regionSafety");
+        }
+
+        private boolean canAccess(WorldPosition position) {
+            if (regionSafety.canAccess(position)) {
+                return true;
+            }
+            unsafePositions.add(position);
+            return false;
+        }
+
+        private MechanicResult apply(MechanicResult result) {
+            if (unsafePositions.isEmpty() || result instanceof MechanicResult.Rejected) {
+                return result;
+            }
+            List<WorldPosition> remaining = new ArrayList<>(unsafePositions);
+            if (result instanceof MechanicResult.Partial partial) {
+                remaining.addAll(partial.remaining());
+                return new MechanicResult.Partial(partial.affectedBlocks(), remaining);
+            }
+            if (result instanceof MechanicResult.Done done) {
+                return new MechanicResult.Partial(done.affectedBlocks(), remaining);
+            }
+            return result;
+        }
     }
 }

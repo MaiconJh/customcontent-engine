@@ -7,6 +7,7 @@ import com.customcontentengine.adapter.bukkit.BukkitDropAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitItemMetadataAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitWorldMutationAdapter;
 import com.customcontentengine.adapter.bukkit.ItemCommandAdapter;
+import com.customcontentengine.adapter.platform.PaperRegionSafetyAdapter;
 import com.customcontentengine.adapter.platform.PaperSchedulerAdapter;
 import com.customcontentengine.adapter.persistence.PdcBlockCodec;
 import com.customcontentengine.adapter.persistence.PdcBlockStore;
@@ -41,7 +42,8 @@ public final class CustomContentPlugin extends JavaPlugin {
         MechanicRegistry mechanicRegistry = new MechanicRegistry(List.of(new AreaBreakMechanic()));
         new MechanicBindingValidator(mechanicRegistry, java.util.Set.of(AreaBreakMechanic.ID))
                 .validate(registry.mechanicBindings());
-        BukkitWorldMutationAdapter worldMutation = new BukkitWorldMutationAdapter();
+        PaperRegionSafetyAdapter regionSafety = new PaperRegionSafetyAdapter();
+        BukkitWorldMutationAdapter worldMutation = new BukkitWorldMutationAdapter(regionSafety);
         InMemoryCooldowns cooldowns = new InMemoryCooldowns();
         PaperSchedulerAdapter scheduler = new PaperSchedulerAdapter(this);
         AreaBreakRuntimeService areaBreakRuntime = new AreaBreakRuntimeService(
@@ -52,7 +54,8 @@ public final class CustomContentPlugin extends JavaPlugin {
                 dropPort,
                 worldMutation,
                 cooldowns,
-                scheduler);
+                scheduler,
+                regionSafety);
         AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerService(
                 registry.mechanicBindings(),
                 AreaBreakMechanic.ID,

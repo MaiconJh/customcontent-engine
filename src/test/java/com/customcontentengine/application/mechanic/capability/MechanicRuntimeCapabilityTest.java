@@ -12,6 +12,7 @@ import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.DropPort;
+import com.customcontentengine.port.RegionSafetyPort;
 import com.customcontentengine.port.WorldMutationPort;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,18 @@ class MechanicRuntimeCapabilityTest {
 
         assertEquals(List.of(POSITION), store.removed);
         assertEquals(List.of("AIR@" + POSITION), worldMutation.mutations);
+    }
+
+    @Test
+    void storedBlockMutationDoesNotMutateUnsafePosition() {
+        FakeBlockStore store = new FakeBlockStore((short) 7);
+        FakeWorldMutation worldMutation = new FakeWorldMutation();
+        RegionSafetyPort unsafe = position -> false;
+
+        new StoredBlockMutation(store, worldMutation, unsafe).breakBlock(POSITION);
+
+        assertEquals(List.of(), store.removed);
+        assertEquals(List.of(), worldMutation.mutations);
     }
 
     @Test

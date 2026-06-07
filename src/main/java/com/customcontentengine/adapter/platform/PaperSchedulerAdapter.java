@@ -14,6 +14,6 @@ public final class PaperSchedulerAdapter implements SchedulerPort {
 
     @Override
     public void runOnRegion(WorldPosition position, Runnable task) {
-        plugin.getServer().getScheduler().runTask(plugin, task);
+        plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, task);
     }
 }

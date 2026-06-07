@@ -21,6 +21,7 @@ import com.customcontentengine.internalapi.mechanic.capability.CooldownView;
 import com.customcontentengine.internalapi.mechanic.capability.ExecutionOrigin;
 import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.DropPort;
+import com.customcontentengine.port.RegionSafetyPort;
 import com.customcontentengine.port.SchedulerPort;
 import com.customcontentengine.port.WorldMutationPort;
 import java.util.ArrayList;
@@ -72,6 +73,30 @@ class AreaBreakRuntimeServiceTest {
     }
 
     @Test
+    void unsafePositionIsNotMutatedAndRemainsPartial() {
+        WorldPosition unsafePosition = new WorldPosition("world", 11, 64, 11);
+        FakeBlockStore blockStore = new FakeBlockStore();
+        flatArea(ORIGIN).forEach(position -> blockStore.blocks.put(position, (short) 7));
+        CapturingDropPort dropPort = new CapturingDropPort();
+        FakeWorldMutation worldMutation = new FakeWorldMutation();
+        AreaBreakRuntimeService service = service(
+                blockStore,
+                dropPort,
+                worldMutation,
+                position -> !position.equals(unsafePosition));
+
+        MechanicResult result = service.executeAdditionalArea(ORIGIN, "player-one");
+
+        MechanicResult.Partial partial = assertInstanceOf(MechanicResult.Partial.class, result);
+        assertEquals(7, partial.affectedBlocks());
+        assertEquals(List.of(unsafePosition), partial.remaining());
+        assertFalse(blockStore.removed.contains(unsafePosition));
+        assertFalse(worldMutation.positions.contains(unsafePosition));
+        assertFalse(dropPort.positions.contains(unsafePosition));
+        assertEquals(Optional.of((short) 7), blockStore.findNumericId(unsafePosition));
+    }
+
+    @Test
     void usesCooldownKeyForRepeatedControlledExecution() {
         FakeBlockStore blockStore = new FakeBlockStore();
         flatArea(ORIGIN).forEach(position -> blockStore.blocks.put(position, (short) 7));
@@ -106,13 +131,22 @@ class AreaBreakRuntimeServiceTest {
             BlockStorePort blockStore,
             DropPort dropPort,
             WorldMutationPort worldMutation) {
+        return service(blockStore, dropPort, worldMutation, position -> true);
+    }
+
+    private static AreaBreakRuntimeService service(
+            BlockStorePort blockStore,
+            DropPort dropPort,
+            WorldMutationPort worldMutation,
+            RegionSafetyPort regionSafety) {
         return service(
                 blockStore,
                 dropPort,
                 worldMutation,
                 new CapturingScheduler(),
                 new MechanicRegistry(List.of(new AreaBreakMechanic())),
-                AreaBreakMechanic.ID);
+                AreaBreakMechanic.ID,
+                regionSafety);
     }
 
     private static AreaBreakRuntimeService service(
@@ -122,6 +156,17 @@ class AreaBreakRuntimeServiceTest {
             SchedulerPort scheduler,
             MechanicRegistry mechanicRegistry,
             MechanicId mechanicId) {
+        return service(blockStore, dropPort, worldMutation, scheduler, mechanicRegistry, mechanicId, position -> true);
+    }
+
+    private static AreaBreakRuntimeService service(
+            BlockStorePort blockStore,
+            DropPort dropPort,
+            WorldMutationPort worldMutation,
+            SchedulerPort scheduler,
+            MechanicRegistry mechanicRegistry,
+            MechanicId mechanicId,
+            RegionSafetyPort regionSafety) {
         DefinitionRegistry definitions = new DefinitionRegistry(List.of(block("ruby_ore", (short) 7)), List.of());
         return new AreaBreakRuntimeService(
                 mechanicRegistry,
@@ -131,7 +176,8 @@ class AreaBreakRuntimeServiceTest {
                 dropPort,
                 worldMutation,
                 new InMemoryCooldowns(),
-                scheduler);
+                scheduler,
+                regionSafety);
     }
 
     private static List<WorldPosition> flatArea(WorldPosition origin) {

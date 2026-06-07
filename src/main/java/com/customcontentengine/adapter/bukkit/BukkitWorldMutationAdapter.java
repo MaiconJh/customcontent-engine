@@ -1,6 +1,7 @@
 package com.customcontentengine.adapter.bukkit;
 
 import com.customcontentengine.internalapi.identity.WorldPosition;
+import com.customcontentengine.port.RegionSafetyPort;
 import com.customcontentengine.port.WorldMutationPort;
 import java.util.Locale;
 import java.util.Objects;
@@ -9,11 +10,24 @@ import org.bukkit.Material;
 import org.bukkit.World;
 
 public final class BukkitWorldMutationAdapter implements WorldMutationPort {
+    private final RegionSafetyPort regionSafety;
+
+    public BukkitWorldMutationAdapter() {
+        this(position -> true);
+    }
+
+    public BukkitWorldMutationAdapter(RegionSafetyPort regionSafety) {
+        this.regionSafety = Objects.requireNonNull(regionSafety, "regionSafety");
+    }
+
     @Override
     public void setBlockMaterial(WorldPosition position, String materialBase) {
         Objects.requireNonNull(position, "position");
         if (materialBase == null || materialBase.isBlank()) {
             throw new IllegalArgumentException("materialBase must not be blank");
+        }
+        if (!regionSafety.canAccess(position)) {
+            return;
         }
         World world = Bukkit.getWorld(position.worldName());
         if (world == null) {
