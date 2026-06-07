@@ -1,6 +1,7 @@
 package com.customcontentengine.adapter.bukkit;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -57,7 +58,7 @@ class MiningInputAdapterTest {
 
         verify(event).setCancelled(true);
         assertTrue(service.getActiveSession(ACTOR_KEY).isPresent());
-        assertTrue(service.getActiveSession(ACTOR_KEY).get().target().equals(TARGET));
+        assertEquals(TARGET, service.getActiveSession(ACTOR_KEY).get().target());
     }
 
     @Test
@@ -197,27 +198,33 @@ class MiningInputAdapterTest {
 
     private static BlockDamageEvent blockDamageEventAt(WorldPosition position) {
         BlockDamageEvent event = mock(BlockDamageEvent.class);
-        when(event.getBlock()).thenReturn(blockAt(position));
-        when(event.getPlayer()).thenReturn(playerWithInventory(mainHand(), null));
+        Block block = blockAt(position);
+        Player player = playerWithInventory(mainHand(), null);
+        when(event.getBlock()).thenReturn(block);
+        when(event.getPlayer()).thenReturn(player);
         return event;
     }
 
     private static BlockDamageAbortEvent blockDamageAbortEventAt(WorldPosition position) {
         BlockDamageAbortEvent event = mock(BlockDamageAbortEvent.class);
-        when(event.getBlock()).thenReturn(blockAt(position));
-        when(event.getPlayer()).thenReturn(playerWithInventory(mainHand(), null));
+        Block block = blockAt(position);
+        Player player = playerWithInventory(mainHand(), null);
+        when(event.getBlock()).thenReturn(block);
+        when(event.getPlayer()).thenReturn(player);
         return event;
     }
 
     private static PlayerQuitEvent playerQuitEvent() {
         PlayerQuitEvent event = mock(PlayerQuitEvent.class);
-        when(event.getPlayer()).thenReturn(playerWithInventory(mainHand(), null));
+        Player player = playerWithInventory(mainHand(), null);
+        when(event.getPlayer()).thenReturn(player);
         return event;
     }
 
     private static PlayerItemHeldEvent playerItemHeldEvent() {
         PlayerItemHeldEvent event = mock(PlayerItemHeldEvent.class);
-        when(event.getPlayer()).thenReturn(playerWithInventory(mainHand(), mainHand()));
+        Player player = playerWithInventory(mainHand(), mainHand());
+        when(event.getPlayer()).thenReturn(player);
         when(event.getNewSlot()).thenReturn(1);
         return event;
     }
