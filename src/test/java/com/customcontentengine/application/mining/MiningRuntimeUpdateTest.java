@@ -77,9 +77,9 @@ class MiningVisualPortTest {
         port.clearMiningVisual(ACTOR_KEY);
 
         assertEquals(1, port.updates.size());
-        assertEquals(ACTOR_KEY, port.updates.get(0).actorKey);
-        assertEquals(TARGET, port.updates.get(0).position);
-        assertEquals(stage, port.updates.get(0).stage);
+        assertEquals(ACTOR_KEY, port.updates.get(0).actorKey());
+        assertEquals(TARGET, port.updates.get(0).position());
+        assertEquals(stage, port.updates.get(0).stage());
         assertEquals(1, port.clears.size());
         assertTrue(port.clears.contains(ACTOR_KEY));
     }

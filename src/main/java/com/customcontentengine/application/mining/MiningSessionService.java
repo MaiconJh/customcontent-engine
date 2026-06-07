@@ -121,21 +121,6 @@ public final class MiningSessionService {
         return ProcessResult.inProgress(session, progress, currentStage, visualStageChanged);
     }
 
-    public MiningRuntimeUpdate processSessionForRuntime(String actorKey, long nowMillis) {
-        Objects.requireNonNull(actorKey, "actorKey");
-        ProcessResult result = processSession(actorKey, nowMillis);
-
-        if (result.session().isEmpty()) {
-            return MiningRuntimeUpdate.noSession();
-        }
-
-        if (result.completed()) {
-            return MiningRuntimeUpdate.completed(result.progress(), result.visualStage(), result.visualStageChanged());
-        }
-
-        return MiningRuntimeUpdate.inProgress(result.progress(), result.visualStage(), result.visualStageChanged());
-    }
-
     public static final class ProcessResult {
         private final Optional<MiningSession> session;
         private final MiningProgress progress;

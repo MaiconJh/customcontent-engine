@@ -147,32 +147,6 @@ class MiningSessionServiceTest {
         assertFalse(cleared);
     }
 
-    @Test
-    void processSessionForRuntimeReturnsUpdateWithVisualAction() {
-        MiningSessionService service = service();
-        service.startSession(ACTOR_KEY, TARGET, TOOL_ID, new MiningHardness(50.0D), new MiningSpeed(10.0D), 1000L);
-
-        MiningSessionService.MiningRuntimeUpdate update1 = service.processSessionForRuntime(ACTOR_KEY, 1500L);
-        assertEquals(MiningSessionService.MiningRuntimeUpdate.VisualAction.UPDATE_STAGE, update1.visualAction());
-        assertFalse(update1.completed());
-
-        MiningSessionService.MiningRuntimeUpdate update2 = service.processSessionForRuntime(ACTOR_KEY, 1600L);
-        assertEquals(MiningSessionService.MiningRuntimeUpdate.VisualAction.NONE, update2.visualAction());
-        assertFalse(update2.completed());
-    }
-
-    @Test
-    void processSessionForRuntimeClearsVisualOnCompletion() {
-        MiningSessionService service = service();
-        service.startSession(ACTOR_KEY, TARGET, TOOL_ID, HARDNESS, SPEED, 1000L);
-
-        MiningSessionService.MiningRuntimeUpdate update = service.processSessionForRuntime(ACTOR_KEY, 3000L);
-
-        assertEquals(MiningSessionService.MiningRuntimeUpdate.VisualAction.CLEAR_VISUAL, update.visualAction());
-        assertTrue(update.completed());
-        assertFalse(service.getActiveSession(ACTOR_KEY).isPresent());
-    }
-
     private static MiningSessionService service() {
         return new MiningSessionService(new InMemoryMiningSessionRepository(), MiningDurationPolicy.DEFAULT);
     }
