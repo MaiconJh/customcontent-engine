@@ -27,6 +27,7 @@ Already available:
 - `SchedulerPort.runOnRegion(WorldPosition, Runnable)`;
 - `RegionSafetyPort` for conservative runtime ownership checks;
 - GitHub Actions for test, build, and integration validation.
+- application-level in-memory mining session management for Phase 3, without Bukkit/Paper runtime integration.
 
 Paper is the primary platform.
 
