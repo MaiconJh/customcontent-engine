@@ -16,7 +16,7 @@ import com.customcontentengine.application.block.BlockService;
 import com.customcontentengine.application.item.ItemService;
 import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
 import com.customcontentengine.application.mechanic.AreaBreakRuntimeService;
-import com.customcontentengine.application.mechanic.AreaBreakTriggerPolicy;
+import com.customcontentengine.application.mechanic.MechanicBindingValidator;
 import com.customcontentengine.application.mechanic.MechanicRegistry;
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
 import com.customcontentengine.builtin.mechanic.AreaBreakMechanic;
@@ -39,6 +39,8 @@ public final class CustomContentPlugin extends JavaPlugin {
         BukkitDropAdapter dropPort = new BukkitDropAdapter(itemService);
         BlockService blockService = new BlockService(registry, blockStore, dropPort);
         MechanicRegistry mechanicRegistry = new MechanicRegistry(List.of(new AreaBreakMechanic()));
+        new MechanicBindingValidator(mechanicRegistry, java.util.Set.of(AreaBreakMechanic.ID))
+                .validate(registry.mechanicBindings());
         BukkitWorldMutationAdapter worldMutation = new BukkitWorldMutationAdapter();
         InMemoryCooldowns cooldowns = new InMemoryCooldowns();
         PaperSchedulerAdapter scheduler = new PaperSchedulerAdapter(this);
@@ -52,7 +54,8 @@ public final class CustomContentPlugin extends JavaPlugin {
                 cooldowns,
                 scheduler);
         AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerService(
-                AreaBreakTriggerPolicy.mvp1Default(),
+                registry.mechanicBindings(),
+                AreaBreakMechanic.ID,
                 areaBreakRuntime);
 
         getServer().getPluginManager().registerEvents(new BlockPlaceAdapter(blockService, itemMetadata), this);

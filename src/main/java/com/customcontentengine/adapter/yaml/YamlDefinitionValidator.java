@@ -56,6 +56,27 @@ public final class YamlDefinitionValidator {
         requireNumber(attributes, "items." + id + ".attributes.damage", "damage");
         requireNumber(attributes, "items." + id + ".attributes.speed", "speed");
         requirePositiveInt(attributes, "items." + id + ".attributes.durability", "durability");
+        if (section.contains("mechanics")) {
+            ConfigurationSection mechanics = requireSection(section, "items." + id + ".mechanics", "mechanics");
+            for (String trigger : mechanics.getKeys(false)) {
+                if (!trigger.equals("on_block_break")) {
+                    throw error("items." + id + ".mechanics." + trigger + " is an unknown mechanic trigger");
+                }
+                if (!mechanics.isList(trigger)) {
+                    throw error("items." + id + ".mechanics." + trigger + " must be a list");
+                }
+                java.util.List<?> mechanicIds = mechanics.getList(trigger);
+                if (mechanicIds == null || mechanicIds.isEmpty()) {
+                    throw error("items." + id + ".mechanics." + trigger + " must contain at least one mechanic id");
+                }
+                for (int index = 0; index < mechanicIds.size(); index++) {
+                    Object mechanicId = mechanicIds.get(index);
+                    if (!(mechanicId instanceof String mechanicIdText) || mechanicIdText.isBlank()) {
+                        throw error("items." + id + ".mechanics." + trigger + "[" + index + "] must be a non-empty string");
+                    }
+                }
+            }
+        }
     }
 
     public void validateCrossReferences(DefinitionRegistry registry) {

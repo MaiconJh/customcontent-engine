@@ -34,3 +34,6 @@ items:
       damage: 5.0
       speed: 1.2
       durability: 500
+    mechanics:
+      on_block_break:
+        - area_break

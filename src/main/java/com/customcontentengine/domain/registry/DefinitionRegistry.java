@@ -2,6 +2,7 @@ package com.customcontentengine.domain.registry;
 
 import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.ItemDef;
+import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import java.util.Collection;
@@ -13,8 +14,16 @@ public final class DefinitionRegistry {
     private final Map<String, BlockDef> blocksById;
     private final Map<Short, BlockDef> blocksByNumericId;
     private final Map<String, ItemDef> itemsById;
+    private final MechanicBindingRegistry mechanicBindings;
 
     public DefinitionRegistry(Collection<BlockDef> blocks, Collection<ItemDef> items) {
+        this(blocks, items, MechanicBindingRegistry.empty());
+    }
+
+    public DefinitionRegistry(
+            Collection<BlockDef> blocks,
+            Collection<ItemDef> items,
+            MechanicBindingRegistry mechanicBindings) {
         Map<String, BlockDef> blockIds = new LinkedHashMap<>();
         Map<Short, BlockDef> numericIds = new LinkedHashMap<>();
         for (BlockDef block : blocks == null ? java.util.List.<BlockDef>of() : blocks) {
@@ -36,6 +45,7 @@ public final class DefinitionRegistry {
         this.blocksById = Map.copyOf(blockIds);
         this.blocksByNumericId = Map.copyOf(numericIds);
         this.itemsById = Map.copyOf(itemIds);
+        this.mechanicBindings = java.util.Objects.requireNonNull(mechanicBindings, "mechanicBindings");
     }
 
     public Optional<BlockDef> findBlock(String id) {
@@ -68,5 +78,9 @@ public final class DefinitionRegistry {
 
     public Map<String, ItemDef> itemsById() {
         return itemsById;
+    }
+
+    public MechanicBindingRegistry mechanicBindings() {
+        return mechanicBindings;
     }
 }

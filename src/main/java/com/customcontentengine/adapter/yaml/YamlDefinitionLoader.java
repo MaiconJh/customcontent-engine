@@ -4,9 +4,13 @@ import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
+import com.customcontentengine.domain.mechanic.MechanicBinding;
+import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
+import com.customcontentengine.domain.mechanic.MechanicTrigger;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
+import com.customcontentengine.internalapi.mechanic.MechanicId;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,9 +29,11 @@ public final class YamlDefinitionLoader {
         try {
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
             validator.validateRoot(yaml);
+            ConfigurationSection itemsSection = yaml.getConfigurationSection("items");
             DefinitionRegistry registry = new DefinitionRegistry(
                     loadBlocks(yaml.getConfigurationSection("blocks")),
-                    loadItems(yaml.getConfigurationSection("items"))
+                    loadItems(itemsSection),
+                    loadMechanicBindings(itemsSection)
             );
             validator.validateCrossReferences(registry);
             return registry;
@@ -87,6 +93,29 @@ public final class YamlDefinitionLoader {
         return items;
     }
 
+    private MechanicBindingRegistry loadMechanicBindings(ConfigurationSection itemsSection) {
+        List<MechanicBinding> bindings = new ArrayList<>();
+        for (String id : itemsSection.getKeys(false)) {
+            ConfigurationSection section = itemsSection.getConfigurationSection(id);
+            if (section == null || !section.contains("mechanics")) {
+                continue;
+            }
+            ConfigurationSection mechanics = section.getConfigurationSection("mechanics");
+            CustomItemId itemId = itemId(id);
+            for (String triggerKey : mechanics.getKeys(false)) {
+                MechanicTrigger trigger = mechanicTrigger(id, triggerKey);
+                List<?> mechanicIds = mechanics.getList(triggerKey);
+                for (int index = 0; index < mechanicIds.size(); index++) {
+                    bindings.add(new MechanicBinding(
+                            itemId,
+                            trigger,
+                            mechanicId(id, triggerKey, index, (String) mechanicIds.get(index))));
+                }
+            }
+        }
+        return new MechanicBindingRegistry(bindings);
+    }
+
     private CustomBlockId blockId(String id) {
         try {
             return new CustomBlockId(id);
@@ -100,6 +129,24 @@ public final class YamlDefinitionLoader {
             return new CustomItemId(id);
         } catch (IllegalArgumentException exception) {
             throw new YamlDefinitionException("Invalid definitions.yml: items." + id + " has invalid id: " + exception.getMessage());
+        }
+    }
+
+    private MechanicTrigger mechanicTrigger(String itemId, String triggerKey) {
+        try {
+            return MechanicTrigger.fromYamlKey(triggerKey);
+        } catch (IllegalArgumentException exception) {
+            throw new YamlDefinitionException("Invalid definitions.yml: items." + itemId + ".mechanics." + triggerKey
+                    + " is an unknown mechanic trigger");
+        }
+    }
+
+    private MechanicId mechanicId(String itemId, String triggerKey, int index, String id) {
+        try {
+            return new MechanicId(id);
+        } catch (IllegalArgumentException exception) {
+            throw new YamlDefinitionException("Invalid definitions.yml: items." + itemId + ".mechanics."
+                    + triggerKey + "[" + index + "] has invalid mechanic id: " + exception.getMessage());
         }
     }
 }

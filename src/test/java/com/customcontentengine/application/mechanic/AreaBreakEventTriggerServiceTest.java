@@ -3,16 +3,25 @@ package com.customcontentengine.application.mechanic;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
 import com.customcontentengine.builtin.mechanic.AreaBreakMechanic;
 import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
+import com.customcontentengine.domain.mechanic.MechanicBinding;
+import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
+import com.customcontentengine.domain.mechanic.MechanicTrigger;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
+import com.customcontentengine.internalapi.mechanic.Capability;
+import com.customcontentengine.internalapi.mechanic.Mechanic;
+import com.customcontentengine.internalapi.mechanic.MechanicContext;
+import com.customcontentengine.internalapi.mechanic.MechanicDescriptor;
+import com.customcontentengine.internalapi.mechanic.MechanicId;
 import com.customcontentengine.internalapi.mechanic.MechanicResult;
 import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.DropPort;
@@ -29,19 +38,38 @@ class AreaBreakEventTriggerServiceTest {
     private static final WorldPosition ORIGIN = new WorldPosition("world", 10, 64, 10);
 
     @Test
-    void defaultPolicyTriggersOnlyRubyPickaxe() {
-        AreaBreakTriggerPolicy policy = AreaBreakTriggerPolicy.mvp1Default();
+    void bindingValidatorRejectsUnknownMechanic() {
+        MechanicBindingRegistry bindings = bindings(new CustomItemId("ruby"), new MechanicId("missing"));
+        MechanicBindingValidator validator = new MechanicBindingValidator(new MechanicRegistry(List.of(new AreaBreakMechanic())));
 
-        assertTrue(policy.shouldTrigger(new CustomItemId("ruby_pickaxe")));
-        assertFalse(policy.shouldTrigger(new CustomItemId("ruby")));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> validator.validate(bindings));
+
+        assertTrue(exception.getMessage().contains("references unknown mechanic: missing"));
     }
 
     @Test
-    void nonMatchingCustomItemDoesNotExecuteAreaBreak() {
+    void bindingValidatorRejectsMechanicNotAllowedInThisPhase() {
+        MechanicId otherId = new MechanicId("other_mechanic");
+        MechanicRegistry registry = new MechanicRegistry(List.of(new AreaBreakMechanic(), new FakeMechanic(otherId, java.util.Set.of())));
+        MechanicBindingValidator validator = new MechanicBindingValidator(registry, java.util.Set.of(AreaBreakMechanic.ID));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validate(bindings(new CustomItemId("ruby"), otherId)));
+
+        assertTrue(exception.getMessage().contains("references mechanic not allowed in this phase: other_mechanic"));
+    }
+
+    @Test
+    void itemWithoutBindingDoesNotExecuteAreaBreak() {
         FakeBlockStore blockStore = new FakeBlockStore();
         flatArea(ORIGIN).forEach(position -> blockStore.blocks.put(position, (short) 7));
         FakeWorldMutation worldMutation = new FakeWorldMutation();
-        AreaBreakEventTriggerService service = service(blockStore, new NoopDropPort(), worldMutation);
+        AreaBreakEventTriggerService service = service(
+                blockStore,
+                new NoopDropPort(),
+                worldMutation,
+                MechanicBindingRegistry.empty());
 
         Optional<MechanicResult> result = service.trigger(new CustomItemId("ruby"), ORIGIN, "player-one");
 
@@ -51,12 +79,16 @@ class AreaBreakEventTriggerServiceTest {
     }
 
     @Test
-    void matchingCustomItemExecutesAdditionalAreaWithoutOrigin() {
+    void itemWithYamlBindingExecutesAdditionalAreaWithoutOrigin() {
         FakeBlockStore blockStore = new FakeBlockStore();
         flatArea(ORIGIN).forEach(position -> blockStore.blocks.put(position, (short) 7));
         CapturingDropPort dropPort = new CapturingDropPort();
         FakeWorldMutation worldMutation = new FakeWorldMutation();
-        AreaBreakEventTriggerService service = service(blockStore, dropPort, worldMutation);
+        AreaBreakEventTriggerService service = service(
+                blockStore,
+                dropPort,
+                worldMutation,
+                bindings(new CustomItemId("ruby_pickaxe"), AreaBreakMechanic.ID));
 
         Optional<MechanicResult> result = service.trigger(new CustomItemId("ruby_pickaxe"), ORIGIN, "player-one");
 
@@ -71,6 +103,18 @@ class AreaBreakEventTriggerServiceTest {
             BlockStorePort blockStore,
             DropPort dropPort,
             WorldMutationPort worldMutation) {
+        return service(
+                blockStore,
+                dropPort,
+                worldMutation,
+                bindings(new CustomItemId("ruby_pickaxe"), AreaBreakMechanic.ID));
+    }
+
+    private static AreaBreakEventTriggerService service(
+            BlockStorePort blockStore,
+            DropPort dropPort,
+            WorldMutationPort worldMutation,
+            MechanicBindingRegistry bindings) {
         AreaBreakRuntimeService runtime = new AreaBreakRuntimeService(
                 new MechanicRegistry(List.of(new AreaBreakMechanic())),
                 AreaBreakMechanic.ID,
@@ -80,7 +124,14 @@ class AreaBreakEventTriggerServiceTest {
                 worldMutation,
                 new InMemoryCooldowns(),
                 new NoopScheduler());
-        return new AreaBreakEventTriggerService(AreaBreakTriggerPolicy.mvp1Default(), runtime);
+        return new AreaBreakEventTriggerService(bindings, AreaBreakMechanic.ID, runtime);
+    }
+
+    private static MechanicBindingRegistry bindings(CustomItemId itemId, MechanicId mechanicId) {
+        return new MechanicBindingRegistry(List.of(new MechanicBinding(
+                itemId,
+                MechanicTrigger.ON_BLOCK_BREAK,
+                mechanicId)));
     }
 
     private static List<WorldPosition> flatArea(WorldPosition origin) {
@@ -151,6 +202,18 @@ class AreaBreakEventTriggerServiceTest {
     private static final class NoopScheduler implements SchedulerPort {
         @Override
         public void runOnRegion(WorldPosition position, Runnable task) {
+        }
+    }
+
+    private record FakeMechanic(MechanicId id, java.util.Set<Capability> capabilities) implements Mechanic {
+        @Override
+        public MechanicDescriptor descriptor() {
+            return new MechanicDescriptor(id, capabilities, false);
+        }
+
+        @Override
+        public MechanicResult execute(MechanicContext context) {
+            return new MechanicResult.Done(0);
         }
     }
 }
