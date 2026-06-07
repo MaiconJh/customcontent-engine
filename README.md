@@ -178,6 +178,12 @@ Unix/macOS:
 ./gradlew binaryPdcSpike --no-daemon
 ```
 
+## Cloud Build
+
+This project includes a GitHub Actions workflow for remote build and tests.
+
+See `docs/build-cloud.md`.
+
 ## Quick Architecture Audits With rg
 
 ```bash
