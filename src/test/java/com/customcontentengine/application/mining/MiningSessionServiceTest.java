@@ -123,7 +123,7 @@ class MiningSessionServiceTest {
     @Test
     void lastVisualStageOnlyChangesWhenNecessary() {
         MiningSessionService service = service();
-        service.startSession(ACTOR_KEY, TARGET, TOOL_ID, new MiningHardness(10.0D), new MiningSpeed(10.0D), 1000L);
+        service.startSession(ACTOR_KEY, TARGET, TOOL_ID, new MiningHardness(50.0D), new MiningSpeed(10.0D), 1000L);
 
         MiningSessionService.ProcessResult first = service.processSession(ACTOR_KEY, 1500L);
         assertTrue(first.visualStageChanged());
