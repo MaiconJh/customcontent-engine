@@ -19,6 +19,7 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.mockito:mockito-core:5.14.2")
     testImplementation("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
