@@ -52,13 +52,16 @@ export async function analyze(payload: AnalyzePayload, env: Env) {
     console.warn(`AI provider fallback used: ${provider.error || "empty response"}`);
   }
   const initialReport = initialFallback ? localFallback(payload) : provider.text || "";
-  const governance = await governanceReview({
+  const governancePayload = {
     ...payload,
     type: "governance",
     initialReport,
     diff: payload.type === "diff" ? payload.diff : undefined,
     log: payload.type === "failure" ? payload.log : undefined,
-  }, env);
+  } satisfies GovernancePayload;
+  const governance = initialFallback
+    ? localGovernance(governancePayload, fallbackReason || "provider unavailable")
+    : await governanceReview(governancePayload, env);
   const finalReport = chooseFinalReport(initialReport, governance);
   const fallback = initialFallback || governance.publishDecision === "fallback";
   const findings = payload.type === "diff" ? diffFindings(payload.diff) : failureFindings(payload.log);

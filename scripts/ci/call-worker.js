@@ -40,6 +40,10 @@ Fallback reporting was published because Worker analysis did not return a comple
 ### Publish Decision
 fallback`;
   }
+  const classification = classifyDiff(payload.diff || "");
+  const categories = formatCategories(classification);
+  const focus = reviewFocus(classification);
+  const risk = fallbackRisk(classification);
   return `## AI Technical Note - Worker analysis fallback
 
 Worker analysis did not complete, so the workflow published a local fallback report. GitHub Actions build/test remains the source of truth.
@@ -55,6 +59,16 @@ ${safeReason}
 * Commit: ${payload.commit}
 * Workflow: ${payload.workflow}
 * Run URL: ${payload.run_url}
+
+### Local fallback analysis
+
+Changed file categories: ${categories}.
+
+${risk}
+
+Review focus:
+
+${focus}
 
 ## AI Governance Review
 
@@ -100,6 +114,87 @@ function responseKeys(value) {
 function errorReason(error) {
   if (error?.name === "AbortError") return "network timeout";
   return `network error: ${sanitizeString(error?.message || "unknown").slice(0, 160)}`;
+}
+
+function classifyDiff(diff) {
+  const files = changedFiles(diff);
+  const known = new Set();
+  const has = (predicate) => {
+    const matched = files.filter(predicate);
+    matched.forEach((file) => known.add(file));
+    return matched.length > 0;
+  };
+  const classification = {
+    javaProduction: has((file) => file.startsWith("src/main/java/")),
+    javaTests: has((file) => file.startsWith("src/test/") || file.startsWith("src/integrationTest/") || file.startsWith("src/spike/")),
+    docs: has((file) => file.startsWith("docs/") || file === "README.md"),
+    workflows: has((file) => file.startsWith(".github/workflows/")),
+    ciScripts: has((file) => file.startsWith("scripts/ci/")),
+    worker: has((file) => file.startsWith("cloudflare/ci-ai-worker/")),
+    configResources: has((file) =>
+      file.startsWith("src/main/resources/")
+      || file.startsWith(".github/ai-review/")
+      || /^build\.gradle(\.kts)?$/.test(file)
+      || file === "settings.gradle.kts"
+      || file.endsWith("wrangler.jsonc")
+      || file.endsWith(".yml")
+      || file.endsWith(".yaml")),
+  };
+  classification.unknown = files.some((file) => !known.has(file));
+  return classification;
+}
+
+function changedFiles(diff) {
+  const files = new Set();
+  for (const match of String(diff || "").matchAll(/^diff --git a\/(.+?) b\/(.+)$/gm)) {
+    files.add(normalizePath(match[2]));
+  }
+  for (const match of String(diff || "").matchAll(/^\+\+\+ b\/(.+)$/gm)) {
+    if (match[1] !== "/dev/null") files.add(normalizePath(match[1]));
+  }
+  return [...files].filter(Boolean).sort();
+}
+
+function normalizePath(file) {
+  return String(file || "").replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function formatCategories(classification) {
+  const categories = [
+    classification.javaProduction ? "java production code" : "",
+    classification.javaTests ? "java tests/spikes" : "",
+    classification.docs ? "docs" : "",
+    classification.workflows ? "GitHub Actions workflows" : "",
+    classification.ciScripts ? "CI scripts" : "",
+    classification.worker ? "Cloudflare Worker" : "",
+    classification.configResources ? "config/resources" : "",
+    classification.unknown ? "unknown" : "",
+  ].filter(Boolean);
+  return categories.length ? categories.join(", ") : "none detected";
+}
+
+function fallbackRisk(classification) {
+  if (classification.javaProduction && !classification.javaTests) {
+    return "Java production source files changed without a Java test diff in this change; use GitHub Actions to assess regression risk.";
+  }
+  if (classification.workflows || classification.ciScripts || classification.worker || classification.configResources) {
+    return "Configuration or automation changes were detected. No production-code regression risk is inferred unless production source files changed.";
+  }
+  if (classification.docs && !classification.javaProduction && !classification.javaTests && !classification.workflows && !classification.ciScripts && !classification.worker && !classification.configResources && !classification.unknown) {
+    return "Documentation-only changes were detected. No runtime behavior impact is inferred by local fallback.";
+  }
+  return "No specific production-code risk was inferred by local fallback.";
+}
+
+function reviewFocus(classification) {
+  const focus = [];
+  if (classification.workflows) focus.push("* Workflow permissions, triggers, environment variables, and report paths.");
+  if (classification.ciScripts) focus.push("* CI script output files, fallback reasons, GitHub API calls, and log clarity.");
+  if (classification.worker) focus.push("* Worker deploy status, provider diagnostics, response schema, and fallback behavior.");
+  if (classification.configResources) focus.push("* Configuration/resource metadata and runtime declarations.");
+  if (classification.javaProduction) focus.push("* Java production behavior and corresponding remote validation evidence.");
+  if (classification.docs) focus.push("* Documentation consistency with project scope, guardrails, ADRs, and milestones.");
+  return focus.length ? focus.join("\n") : "* Manually inspect the diff and compare it with repository documentation.";
 }
 
 async function main() {

@@ -25,17 +25,13 @@ export async function callKiloChatCompletion(env: Env, system: string, user: str
   const errors: string[] = [];
 
   for (const model of models) {
-    const attempts = [0, 1];
-    for (const attempt of attempts) {
-      const result = await postCompletion(endpoint, env, model, system, user);
-      if (result.ok) return result;
-      if (result.error) {
-        errors.push(`${model}: ${result.error}`);
-        console.warn(`Kilo provider attempt failed for ${model}: ${result.error}`);
-      }
-      if (attempt === 0 && !isTransient(result.error || "")) break;
-      await sleep(150 * (attempt + 1));
+    const result = await postCompletion(endpoint, env, model, system, user);
+    if (result.ok) return result;
+    if (result.error) {
+      errors.push(`${model}: ${result.error}`);
+      console.warn(`Kilo provider attempt failed for ${model}: ${result.error}`);
     }
+    if (isTransient(result.error || "")) await sleep(150);
   }
   return { ok: false, error: errors[errors.length - 1] || "provider unavailable" };
 }
@@ -44,7 +40,7 @@ async function postCompletion(endpoint: string, env: Env, model: string, system:
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (env.KILO_API_KEY) headers.Authorization = `Bearer ${env.KILO_API_KEY}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(env.KILO_TIMEOUT_MS || "60000"));
+  const timeout = setTimeout(() => controller.abort(), Number(env.KILO_TIMEOUT_MS || "30000"));
   try {
     const res = await fetch(endpoint, {
       method: "POST",

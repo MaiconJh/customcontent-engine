@@ -214,7 +214,7 @@ KILO_ENDPOINT=https://api.kilo.ai/api/gateway/chat/completions
 KILO_MODEL=kilo-auto/free
 KILO_FALLBACK_MODEL=kilo-auto/balanced
 KILO_SECOND_FALLBACK_MODEL=kilo/auto-free
-KILO_TIMEOUT_MS=60000
+KILO_TIMEOUT_MS=30000
 ```
 
 `KILO_API_KEY` is optional. If it is not configured, the Worker does not send an `Authorization` header.
