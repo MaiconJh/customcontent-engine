@@ -16,9 +16,9 @@ export function kiloEndpoint(env: Env): string {
 export async function callKiloChatCompletion(env: Env, system: string, user: string): Promise<KiloResult> {
   const endpoint = kiloEndpoint(env);
   const models = [
-    env.KILO_MODEL || "kilo/auto-free",
-    env.KILO_FALLBACK_MODEL || "minimax/minimax-m2.5:free",
-    env.KILO_SECOND_FALLBACK_MODEL || "z-ai/glm-5:free",
+    env.KILO_MODEL || "kilo-auto/free",
+    env.KILO_FALLBACK_MODEL || "kilo-auto/balanced",
+    env.KILO_SECOND_FALLBACK_MODEL || "kilo/auto-free",
   ].filter(Boolean);
 
   for (const model of models) {
@@ -54,7 +54,7 @@ async function postCompletion(endpoint: string, env: Env, model: string, system:
       }),
     });
     const body = await res.json().catch(() => null) as unknown;
-    if (!res.ok) return { ok: false, model, error: `${res.status}` };
+    if (!res.ok) return { ok: false, model, error: `provider status ${res.status}` };
     const text = extractText(body);
     return text ? { ok: true, text, model } : { ok: false, model, error: "empty response" };
   } catch (error) {
@@ -72,6 +72,10 @@ function extractText(body: unknown): string {
     ? (choices[0].message as Record<string, unknown>).content
     : undefined;
   if (typeof content === "string") return content;
+  const reasoning = choices?.[0]?.message && typeof choices[0].message === "object"
+    ? (choices[0].message as Record<string, unknown>).reasoning
+    : undefined;
+  if (typeof reasoning === "string") return reasoning;
   if (typeof record.output_text === "string") return record.output_text;
   if (typeof record.text === "string") return record.text;
   return "";

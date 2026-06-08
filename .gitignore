@@ -1,6 +1,8 @@
 .gradle/
 build/
 
+.env
+
 .vscode/
 
 node_modules/

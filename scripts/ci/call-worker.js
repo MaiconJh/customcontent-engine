@@ -9,11 +9,11 @@ function arg(name, fallback) {
 
 function fallbackMarkdown(type, payload) {
   if (type === "failure") {
-    return `## CI Failure - build/test falhou
+    return `## CI Failure - build/test failed
 
-A analise por IA nao foi gerada porque o Worker nao esta configurado ou falhou.
+AI analysis was not generated because the Worker is not configured or failed.
 
-### Dados
+### Data
 
 * Repository: ${payload.repository}
 * Branch: ${payload.branch}
@@ -21,17 +21,17 @@ A analise por IA nao foi gerada porque o Worker nao esta configurado ou falhou.
 * Workflow: ${payload.workflow}
 * Run URL: ${payload.run_url}
 
-### Proximos passos
+### Next steps
 
-* Verificar build.log no artifact.
-* Corrigir erro de build/test.
-* Reexecutar workflow.`;
+* Check the build.log artifact.
+* Fix the build/test failure.
+* Re-run the workflow.`;
   }
-  return `## AI Technical Note - analise indisponivel
+  return `## AI Technical Note - analysis unavailable
 
-O Worker nao esta configurado ou nao respondeu. O build/test continua sendo a fonte de verdade deste workflow.
+The Worker is not configured or did not respond. Build/test remains the source of truth for this workflow.
 
-### Dados
+### Data
 
 * Repository: ${payload.repository}
 * Branch: ${payload.branch}

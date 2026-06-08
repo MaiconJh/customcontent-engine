@@ -2,21 +2,21 @@ import type { AnalyzePayload, Env } from "./types";
 import { maxModelInputChars } from "./security";
 import { sanitizeText } from "./sanitizer";
 
-export const SYSTEM_PROMPT = `Voce e um revisor tecnico de CI/CD e codigo.
-Analise somente os dados fornecidos.
-Nao invente arquivos.
-Nao invente comandos.
-Nao invente dependencias.
-Nao exponha segredos.
-Nao repita logs completos.
-Nao gere respostas longas demais.
-Se houver incerteza, diga explicitamente.
-Retorne Markdown claro, objetivo e acionavel.
-Prefira snippets pequenos e funcionais.
-Nao gere codigo perigoso.
-Nao recomende desativar testes para resolver falha.
-Nao recomende ignorar erro de build.
-Priorize correcao real.`;
+export const SYSTEM_PROMPT = `You are a technical reviewer for CI/CD and code changes.
+Analyze only the provided data.
+Do not invent files.
+Do not invent commands.
+Do not invent dependencies.
+Do not expose secrets.
+Do not repeat full logs.
+Do not generate overly long responses.
+If there is uncertainty, state it explicitly.
+Return clear, concise, actionable Markdown in English.
+Prefer small, functional snippets.
+Do not generate dangerous code.
+Do not recommend disabling tests to fix failures.
+Do not recommend ignoring build errors.
+Prioritize real fixes.`;
 
 export function buildPrompt(payload: AnalyzePayload, env: Env): { system: string; user: string } {
   const limit = maxModelInputChars(env);
@@ -32,20 +32,20 @@ Run URL: ${payload.run_url}`;
       system: SYSTEM_PROMPT,
       user: sanitizeText(`${common}
 
-Voce esta analisando uma falha de build/test em projeto Java/Gradle/Maven.
-Use apenas o log sanitizado e metadados fornecidos.
+You are analyzing a build/test failure in a Java/Gradle/Maven project.
+Use only the sanitized log and provided metadata.
 
-Retorne Markdown com:
+Return Markdown with:
 
-## Resumo
-## Causa provavel
-## Evidencia do log
-## Arquivos possivelmente relacionados
-## Correcao sugerida
-## Snippet sugerido
-## Proximos passos
+## Summary
+## Likely cause
+## Log evidence
+## Possibly related files
+## Suggested fix
+## Suggested snippet
+## Next steps
 
-Log sanitizado:
+Sanitized log:
 ${payload.log}`, limit),
     };
   }
@@ -56,20 +56,20 @@ ${payload.log}`, limit),
 Base: ${payload.base || ""}
 Head: ${payload.head || ""}
 
-Voce esta analisando um diff de codigo/documentacao/configuracao.
-Use apenas o diff sanitizado e metadados fornecidos.
-Priorize regressoes, testes quebrados, arquitetura, Gradle/Maven, YAML, JSON, documentacao, seguranca e compatibilidade.
+You are analyzing a code/documentation/configuration diff.
+Use only the sanitized diff and provided metadata.
+Prioritize regressions, broken tests, architecture, Gradle/Maven, YAML, JSON, documentation, security, and compatibility.
 
-Retorne Markdown com:
+Return Markdown with:
 
-## Resumo
-## Impacto tecnico
-## Riscos
-## Configuracao antiga vs nova
-## Orientacoes
-## Checklist sugerido
+## Summary
+## Technical impact
+## Risks
+## Previous vs new configuration
+## Guidance
+## Suggested checklist
 
-Diff sanitizado:
+Sanitized diff:
 ${payload.diff}`, limit),
   };
 }

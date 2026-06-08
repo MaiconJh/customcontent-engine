@@ -3,7 +3,7 @@ import { errorResponse, okResponse } from "../src/response-schema";
 
 describe("response schema", () => {
   it("returns ok responses", () => {
-    expect(okResponse("diff", "## Resumo\nTudo certo").ok).toBe(true);
+    expect(okResponse("diff", "## Summary\nAll good").ok).toBe(true);
   });
 
   it("returns error responses", async () => {

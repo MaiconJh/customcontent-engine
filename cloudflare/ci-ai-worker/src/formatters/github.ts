@@ -1,18 +1,18 @@
 import type { AnalyzePayload, Finding } from "../types";
 import { sanitizeText } from "../sanitizer";
 
-export function formatGithubMarkdown(payload: AnalyzePayload, markdown: string, fallback = false): string {
-  const heading = payload.type === "failure" ? "## CI Failure - build/test falhou" : diffHeading(payload.event);
+export function formatGithubMarkdown(payload: AnalyzePayload, markdown: string, fallback = false, fallbackReason = "provider unavailable"): string {
+  const heading = payload.type === "failure" ? "## CI Failure - build/test failed" : diffHeading(payload.event);
   const clean = sanitizeText(markdown, 10000).replace(/```[\s\S]{2500,}?```/g, (block) => `${block.slice(0, 2500)}\n[TRUNCATED]\n\`\`\``);
   const body = clean.trim().startsWith("##") ? clean.trim() : `${heading}\n\n${clean.trim()}`;
   return `${body}
 
-### Metadados
+### Metadata
 
 * Commit: ${payload.commit}
 * Branch: ${payload.branch}
 * Workflow: ${payload.workflow}
-* Run: ${payload.run_url}${fallback ? "\n\n> Fallback local usado porque o provider de IA nao respondeu." : ""}`;
+* Run: ${payload.run_url}${fallback ? `\n\n> Local fallback was used because the AI provider did not return a usable response. Safe reason: ${sanitizeText(fallbackReason, 160)}.` : ""}`;
 }
 
 export function normalizeFindings(findings: Finding[]): Finding[] {
@@ -30,5 +30,5 @@ export function normalizeFindings(findings: Finding[]): Finding[] {
 }
 
 function diffHeading(event: string): string {
-  return event === "push" ? "## AI Technical Note - atualizacao na main" : "## AI Review - analise da alteracao";
+  return event === "push" ? "## AI Technical Note - main update" : "## AI Review - change analysis";
 }

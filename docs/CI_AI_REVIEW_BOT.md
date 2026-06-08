@@ -1,10 +1,10 @@
 # CI AI Review Bot
 
-## O que e
+## What It Is
 
-CI AI Review Bot e uma mini-plataforma interna para rodar build/test, analisar falhas, analisar diffs, criar issues de falha e comentar pull requests. O GitHub Actions coleta logs e diffs sanitizados, o Cloudflare Worker atua como camada segura, e o Kilo Gateway e usado como provider OpenAI-compatible configuravel.
+CI AI Review Bot is an internal mini-platform that runs build/test checks, analyzes failures, analyzes diffs, creates failure issues, and comments on pull requests. GitHub Actions collects sanitized logs and diffs, Cloudflare Worker acts as the secure middle layer, and Kilo Gateway is used as a configurable OpenAI-compatible provider.
 
-## Arquitetura
+## Architecture
 
 ```text
 GitHub Actions
@@ -12,13 +12,13 @@ GitHub Actions
 -> sanitize logs/diff
 -> Cloudflare Worker
 -> Kilo Gateway
--> resposta Markdown
+-> Markdown response
 -> GitHub issue/comment
 ```
 
-O Worker tambem tem fallback local por regex quando o provider esta indisponivel.
+The Worker also includes a regex-based local fallback when the provider is unavailable.
 
-## Arquivos criados
+## Created Files
 
 - `.github/workflows/ci-ai-review.yml`
 - `.github/ai-review/config.yml`
@@ -30,10 +30,12 @@ O Worker tambem tem fallback local por regex quando o provider esta indisponivel
 - `scripts/ci/create-or-update-issue.js`
 - `scripts/ci/create-or-update-push-note.js`
 - `scripts/ci/github-api.js`
+- `scripts/ci/test-worker-api.js`
+- `scripts/ci/test-kilo-api.js`
 - `cloudflare/ci-ai-worker/src/**`
 - `cloudflare/ci-ai-worker/test/**`
 
-## Como preparar Cloudflare
+## Prepare Cloudflare
 
 ```bash
 cd cloudflare/ci-ai-worker
@@ -43,29 +45,29 @@ npm run dev
 npm run deploy
 ```
 
-O deploy deve ser executado somente depois do login local com Wrangler.
+Deploy only after completing the local Wrangler login.
 
-## Como configurar GitHub Actions
+## Configure GitHub Actions
 
-Configure em `Settings -> Secrets and variables -> Actions`.
+Configure values in `Settings -> Secrets and variables -> Actions`.
 
-Variavel recomendada:
+Recommended variable:
 
-- `CI_AI_WORKER_URL`: URL publica do Worker implantado.
+- `CI_AI_WORKER_URL`: public URL of the deployed Worker.
 
-Segredo opcional:
+Optional secret:
 
-- `CI_WORKER_SHARED_SECRET`: usado quando `REQUIRE_SHARED_SECRET=true` no Worker.
+- `CI_WORKER_SHARED_SECRET`: used when `REQUIRE_SHARED_SECRET=true` in the Worker.
 
-Se `CI_AI_WORKER_URL` nao estiver configurada, build/test continua rodando. A analise usa uma mensagem fallback local e nao mascara falha real do CI.
+If `CI_AI_WORKER_URL` is not configured, build/test still runs. Analysis uses a local fallback message and does not mask real CI failures.
 
-## Como usar sem token do Kilo
+## Use Kilo Without A Token
 
-`KILO_API_KEY` e opcional. Por padrao, o Worker nao envia `Authorization` ao Kilo Gateway. Modelos free/anonimos podem ser usados quando disponiveis. Para modelos pagos ou autenticados, configure `KILO_API_KEY` como secret/var do Worker, nao no GitHub Actions.
+`KILO_API_KEY` is optional. By default, the Worker does not send `Authorization` to Kilo Gateway. The current default model is `kilo-auto/free`, when available for anonymous or limited free usage. For paid or authenticated models, configure `KILO_API_KEY` as a Worker secret/variable, not in GitHub Actions.
 
-## Como configurar Worker
+## Configure The Worker
 
-Variaveis principais em `wrangler.jsonc`:
+Main variables in `wrangler.jsonc`:
 
 - `ALLOWED_REPOSITORIES`
 - `MAX_BODY_BYTES`
@@ -81,9 +83,9 @@ Variaveis principais em `wrangler.jsonc`:
 - `KILO_SECOND_FALLBACK_MODEL`
 - `KILO_API_KEY`
 
-`ALLOWED_REPOSITORIES` deve conter apenas repositorios autorizados, separados por virgula.
+`ALLOWED_REPOSITORIES` must contain only authorized repositories, separated by commas.
 
-## Como testar manualmente
+## Manual Testing
 
 Health:
 
@@ -131,45 +133,53 @@ curl -X POST https://worker-url/v1/analyze/failure \
   }'
 ```
 
-Se `REQUIRE_SHARED_SECRET=true`, adicione:
+If `REQUIRE_SHARED_SECRET=true`, add:
 
 ```bash
--H "X-CI-Worker-Secret: valor-sem-expor"
+-H "X-CI-Worker-Secret: value-without-exposing-it"
 ```
 
-## Seguranca
+Local scripts:
 
-A automacao aplica sanitizacao antes de sair do GitHub Actions e novamente dentro do Worker. Tokens, cookies, headers `Authorization`, chaves privadas, variaveis sensiveis e arquivos `.env` sao substituidos por `[REDACTED]`.
+```bash
+node scripts/ci/test-worker-api.js
+node scripts/ci/test-kilo-api.js
+```
 
-O Worker valida metodo, rota, `Content-Type`, tamanho maximo, repositorio em allowlist e evento permitido. Ele aplica rate limit por IP, repositorio, rota e evento, bloqueia CORS por padrao, nao aceita URLs arbitrarias do cliente e nao funciona como proxy generico.
+## Security
 
-## Como evitar spam
+The automation sanitizes data before it leaves GitHub Actions and sanitizes it again inside the Worker. Tokens, cookies, `Authorization` headers, private keys, sensitive variables, and `.env` files are replaced with `[REDACTED]`.
 
-Comentarios e issues usam marcadores HTML ocultos:
+The Worker validates method, route, `Content-Type`, maximum payload size, repository allowlist, and allowed events. It applies rate limiting by IP, repository, route, and event. CORS is blocked by default, arbitrary client-provided URLs are not accepted, and the Worker does not act as a generic proxy.
+
+## Spam Prevention
+
+Comments and issues use hidden HTML markers:
 
 - `<!-- ai-ci-review-bot:summary -->`
 - `<!-- ai-ci-review-bot:failure -->`
 - `<!-- ai-ci-review-bot:diff -->`
 - `<!-- ai-ci-review-bot:push-note -->`
 
-O bot atualiza comentarios existentes em PRs, reutiliza issue aberta de falha por branch/SHA e mantem uma issue tecnica unica para notas de push na `main`.
+The bot updates existing PR comments, reuses open failure issues by branch/SHA, and keeps one technical note issue for pushes to `main`.
 
-## Pull requests de forks
+## Pull Requests From Forks
 
-O workflow usa `pull_request`, nao `pull_request_target`. Secrets nao sao expostos para forks. Se permissoes forem limitadas, a publicacao de comentario pode falhar sem quebrar o CI. Build/test continua sendo executado normalmente.
+The workflow uses `pull_request`, not `pull_request_target`. Secrets are not exposed to forks. If permissions are limited, comment publication may fail without breaking CI. Build/test still runs normally.
 
 ## Troubleshooting
 
-- Worker nao configurado: defina `CI_AI_WORKER_URL` em Actions variables.
-- `CI_AI_WORKER_URL` ausente: build/test roda, analise usa fallback.
-- Kilo indisponivel: Worker retorna fallback local.
-- Modelo invalido: provider tenta `KILO_FALLBACK_MODEL` e `KILO_SECOND_FALLBACK_MODEL`.
-- Rate limited: aumente limites com cuidado ou aguarde a janela expirar.
-- Payload grande demais: reduza `MAX_DIFF_CHARS`, `MAX_CHARS` ou aumente `MAX_BODY_BYTES`.
-- GitHub sem permissao para issues: confira `permissions` do workflow e politicas do repositorio/fork.
-- Pull request de fork: comentarios podem ser bloqueados pelas permissoes do GitHub, mas nao devem falhar o CI.
+- Worker not configured: set `CI_AI_WORKER_URL` in Actions variables.
+- Missing `CI_AI_WORKER_URL`: build/test runs and analysis uses fallback.
+- Kilo unavailable: the Worker returns local fallback.
+- Invalid model: the provider tries `KILO_FALLBACK_MODEL` and `KILO_SECOND_FALLBACK_MODEL`.
+- "Local fallback was used": the Worker received the payload, but Kilo Gateway returned an error, empty response, timeout, or required authentication. Check `KILO_BASE_URL`, `KILO_CHAT_COMPLETIONS_PATH`, configured models, and configure `KILO_API_KEY` in the Worker if needed.
+- Rate limited: increase limits carefully or wait for the window to expire.
+- Payload too large: reduce `MAX_DIFF_CHARS` or `MAX_CHARS`, or increase `MAX_BODY_BYTES`.
+- GitHub cannot create issues: check workflow `permissions` and repository/fork policies.
+- Pull request from a fork: comments may be blocked by GitHub permissions, but CI should not fail.
 
-## Proximos comandos
+## Next Commands
 
 ```bash
 cd cloudflare/ci-ai-worker

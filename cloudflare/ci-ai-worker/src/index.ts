@@ -39,9 +39,12 @@ export async function analyze(payload: AnalyzePayload, env: Env) {
   const prompt = buildPrompt(payload, env);
   const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
   const fallback = !provider.ok || !provider.text;
+  if (fallback) {
+    console.warn(`AI provider fallback used: ${provider.error || "empty response"}`);
+  }
   const markdown = fallback ? localFallback(payload) : provider.text || "";
   const findings = payload.type === "diff" ? diffFindings(payload.diff) : failureFindings(payload.log);
-  return okResponse(payload.type, formatGithubMarkdown(payload, markdown, fallback), normalizeFindings(findings), fallback);
+  return okResponse(payload.type, formatGithubMarkdown(payload, markdown, fallback, provider.error || "empty response"), normalizeFindings(findings), fallback);
 }
 
 export function localFallback(payload: AnalyzePayload): string {
@@ -53,91 +56,91 @@ export function localFallback(payload: AnalyzePayload): string {
       "NullPointerException", "Execution failed for task", "Could not determine java version", "Permission denied",
       "./gradlew: No such file or directory",
     ].filter((pattern) => log.includes(pattern));
-    return `## Resumo
+    return `## Summary
 
-O build/test falhou. ${matched.length ? `Padroes detectados: ${matched.join(", ")}.` : "Nao houve evidencia suficiente para apontar uma causa unica."}
+Build/test failed. ${matched.length ? `Detected patterns: ${matched.join(", ")}.` : "There is not enough evidence to identify a single cause."}
 
-## Causa provavel
+## Likely cause
 
-${matched[0] || "Falha de compilacao, teste ou configuracao detectada no log sanitizado."}
+${matched[0] || "Compilation, test, or configuration failure detected in the sanitized log."}
 
-## Evidencia do log
+## Log evidence
 
 \`\`\`text
 ${extractEvidence(log)}
 \`\`\`
 
-## Arquivos possivelmente relacionados
+## Possibly related files
 
-Nao inferido com seguranca a partir do log sanitizado.
+Not safely inferred from the sanitized log.
 
-## Correcao sugerida
+## Suggested fix
 
-Reproduza localmente com o mesmo comando do CI e corrija a primeira falha real do log.
+Reproduce locally with the same CI command and fix the first real failure in the log.
 
-## Proximos passos
+## Next steps
 
-* Abrir o artifact build.log.
-* Corrigir a causa raiz.
-* Reexecutar o workflow.`;
+* Open the build.log artifact.
+* Fix the root cause.
+* Re-run the workflow.`;
   }
 
   const diff = payload.diff;
   const hints = [
-    [/build\.gradle|build\.gradle\.kts|pom\.xml/, "Alteracao em build/dependencias detectada."],
-    [/\.github\/workflows/, "Alteracao em GitHub Actions detectada; revisar permissoes, cache e gatilhos."],
-    [/src\/main\//, "Codigo de producao alterado."],
-    [/src\/test\//, "Testes alterados."],
-    [/secrets?|env|token|permission/i, "Alteracao sensivel de configuracao detectada."],
+    [/build\.gradle|build\.gradle\.kts|pom\.xml/, "Build/dependency change detected."],
+    [/\.github\/workflows/, "GitHub Actions change detected; review permissions, cache, and triggers."],
+    [/src\/main\//, "Production code changed."],
+    [/src\/test\//, "Tests changed."],
+    [/secrets?|env|token|permission/i, "Sensitive configuration change detected."],
   ].filter(([regex]) => (regex as RegExp).test(diff)).map(([, msg]) => msg);
-  return `## Resumo
+  return `## Summary
 
-Diff analisado por fallback local. ${hints.join(" ") || "Nenhum padrao critico detectado por regex."}
+Diff analyzed by local fallback. ${hints.join(" ") || "No critical pattern was detected by regex."}
 
-## Impacto tecnico
+## Technical impact
 
-Revise se as mudancas afetam build, testes, configuracao ou comportamento de producao.
+Review whether the changes affect build, tests, configuration, or production behavior.
 
-## Riscos
+## Risks
 
-Mudancas em codigo de producao sem teste correspondente podem aumentar risco de regressao.
+Production code changes without a corresponding test diff may increase regression risk.
 
-## Configuracao antiga vs nova
+## Previous vs new configuration
 
-* Antes: conforme linhas removidas do diff.
-* Depois: conforme linhas adicionadas do diff.
-* Impacto: validar comandos e permissoes quando arquivos de configuracao mudarem.
-* Risco: cache, versao Java, dependencias e permissoes podem mudar o resultado do CI.
-* Ajuste recomendado: manter testes e documentacao alinhados.
+* Previous: see removed lines in the diff.
+* New: see added lines in the diff.
+* Impact: validate commands and permissions when configuration files change.
+* Risk: cache, Java version, dependencies, and permissions can change CI behavior.
+* Recommended adjustment: keep tests and documentation aligned.
 
-## Orientacoes
+## Guidance
 
-Use o build/test como fonte de verdade e revise manualmente pontos sensiveis.
+Use build/test as the source of truth and manually review sensitive points.
 
-## Checklist sugerido
+## Suggested checklist
 
-* [ ] Build local executado.
-* [ ] Testes relevantes atualizados.
-* [ ] Configuracao revisada.`;
+* [ ] Local build executed.
+* [ ] Relevant tests updated.
+* [ ] Configuration reviewed.`;
 }
 
 function extractEvidence(text: string): string {
-  return text.split("\n").filter((line) => /BUILD FAILED|Compilation failed|Test failed|Could not|Exception|Execution failed|Permission denied/i.test(line)).slice(0, 12).join("\n").slice(0, 1600) || "Sem evidencia curta disponivel.";
+  return text.split("\n").filter((line) => /BUILD FAILED|Compilation failed|Test failed|Could not|Exception|Execution failed|Permission denied/i.test(line)).slice(0, 12).join("\n").slice(0, 1600) || "No short evidence available.";
 }
 
 function failureFindings(log: string): Finding[] {
   return /BUILD FAILED|Compilation failed|There were failing tests/.test(log)
-    ? [{ severity: "error", title: "Build/test failed", body: "O log sanitizado indica falha real de build ou teste." }]
+    ? [{ severity: "error", title: "Build/test failed", body: "The sanitized log indicates a real build or test failure." }]
     : [];
 }
 
 function diffFindings(diff: string): Finding[] {
   const findings: Finding[] = [];
   if (/^\+\+\+ b\/src\/main\//m.test(diff) && !/^\+\+\+ b\/src\/test\//m.test(diff)) {
-    findings.push({ severity: "warning", title: "Production change without test diff", body: "Codigo de producao mudou sem alteracao de teste no diff." });
+    findings.push({ severity: "warning", title: "Production change without test diff", body: "Production code changed without a test change in the diff." });
   }
   if (/^\+\+\+ b\/\.github\/workflows\//m.test(diff) && /permissions:/m.test(diff)) {
-    findings.push({ severity: "warning", file: ".github/workflows", title: "Workflow permissions changed", body: "Revise se as permissoes continuam minimas." });
+    findings.push({ severity: "warning", file: ".github/workflows", title: "Workflow permissions changed", body: "Review whether permissions are still minimal." });
   }
   return findings;
 }

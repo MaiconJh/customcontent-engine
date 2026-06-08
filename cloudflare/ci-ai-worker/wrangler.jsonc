@@ -15,9 +15,9 @@
     "CI_WORKER_SHARED_SECRET": "",
     "KILO_BASE_URL": "https://api.kilo.ai/api/gateway",
     "KILO_CHAT_COMPLETIONS_PATH": "/chat/completions",
-    "KILO_MODEL": "kilo/auto-free",
-    "KILO_FALLBACK_MODEL": "minimax/minimax-m2.5:free",
-    "KILO_SECOND_FALLBACK_MODEL": "z-ai/glm-5:free",
+    "KILO_MODEL": "kilo-auto/free",
+    "KILO_FALLBACK_MODEL": "kilo-auto/balanced",
+    "KILO_SECOND_FALLBACK_MODEL": "kilo/auto-free",
     "KILO_API_KEY": ""
   }
 }
