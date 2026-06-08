@@ -406,13 +406,31 @@ function writeImplementationNote(filePath, content) {
 }
 
 function changedFiles() {
-  return runGit(["diff", "--name-only"]).split(/\r?\n/).map((file) => file.trim()).filter(Boolean);
+  const status = runGit(["status", "--short", "--untracked-files=all"]);
+  return status
+    .split(/\r?\n/)
+    .map((line) => line.slice(3).trim().split(" -> ").pop())
+    .map(normalizePath)
+    .filter(Boolean);
 }
 
 function actualDiffLines(files) {
   if (!files.length) return 0;
-  const diff = runGit(["diff", "--unified=0", "--", ...files]);
-  return diff.split(/\r?\n/).filter((line) => /^[+-]/.test(line) && !/^\+\+\+|^---/.test(line)).length;
+  const tracked = files.filter(isTrackedFile);
+  const untracked = files.filter((file) => !isTrackedFile(file) && fs.existsSync(file));
+  const trackedDiff = tracked.length ? runGit(["diff", "--unified=0", "--", ...tracked]) : "";
+  const trackedLines = trackedDiff.split(/\r?\n/).filter((line) => /^[+-]/.test(line) && !/^\+\+\+|^---/.test(line)).length;
+  const untrackedLines = untracked.reduce((sum, file) => sum + fs.readFileSync(file, "utf8").split(/\r?\n/).length, 0);
+  return trackedLines + untrackedLines;
+}
+
+function isTrackedFile(file) {
+  try {
+    runGit(["ls-files", "--error-unmatch", file]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function commitAndPush(branch, files, issueNumber) {
