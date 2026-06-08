@@ -11,6 +11,7 @@ import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.ItemMetadataPort;
+import com.customcontentengine.port.MiningVisualPort;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.LongSupplier;
@@ -29,14 +30,16 @@ public final class MiningInputAdapter implements Listener {
     private final BlockStorePort blockStore;
     private final ItemMetadataPort<ItemStack> itemMetadata;
     private final MiningSessionService miningSessionService;
+    private final MiningVisualPort miningVisualPort;
     private final LongSupplier clockMillis;
 
     public MiningInputAdapter(
             DefinitionRegistry registry,
             BlockStorePort blockStore,
             ItemMetadataPort<ItemStack> itemMetadata,
-            MiningSessionService miningSessionService) {
-        this(registry, blockStore, itemMetadata, miningSessionService, System::currentTimeMillis);
+            MiningSessionService miningSessionService,
+            MiningVisualPort miningVisualPort) {
+        this(registry, blockStore, itemMetadata, miningSessionService, miningVisualPort, System::currentTimeMillis);
     }
 
     MiningInputAdapter(
@@ -44,11 +47,13 @@ public final class MiningInputAdapter implements Listener {
             BlockStorePort blockStore,
             ItemMetadataPort<ItemStack> itemMetadata,
             MiningSessionService miningSessionService,
+            MiningVisualPort miningVisualPort,
             LongSupplier clockMillis) {
         this.registry = Objects.requireNonNull(registry, "registry");
         this.blockStore = Objects.requireNonNull(blockStore, "blockStore");
         this.itemMetadata = Objects.requireNonNull(itemMetadata, "itemMetadata");
         this.miningSessionService = Objects.requireNonNull(miningSessionService, "miningSessionService");
+        this.miningVisualPort = Objects.requireNonNull(miningVisualPort, "miningVisualPort");
         this.clockMillis = Objects.requireNonNull(clockMillis, "clockMillis");
     }
 
@@ -82,14 +87,21 @@ public final class MiningInputAdapter implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockDamageAbort(BlockDamageAbortEvent event) {
-        miningSessionService.cancelSession(
-                event.getPlayer().getUniqueId().toString(),
+        String actorKey = event.getPlayer().getUniqueId().toString();
+        boolean canceled = miningSessionService.cancelSession(
+                actorKey,
                 toWorldPosition(event.getBlock().getLocation()));
+        if (canceled) {
+            miningVisualPort.clearMiningVisual(actorKey);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
-        miningSessionService.clearSession(event.getPlayer().getUniqueId().toString());
+        String actorKey = event.getPlayer().getUniqueId().toString();
+        if (miningSessionService.clearSession(actorKey)) {
+            miningVisualPort.clearMiningVisual(actorKey);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -106,6 +118,7 @@ public final class MiningInputAdapter implements Listener {
                 itemMetadata.readCustomItemIdentity(newItem);
         if (newToolId.isEmpty() || !newToolId.get().equals(active.get().toolId())) {
             miningSessionService.clearSession(actorKey);
+            miningVisualPort.clearMiningVisual(actorKey);
         }
     }
 

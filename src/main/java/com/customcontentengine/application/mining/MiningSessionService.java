@@ -10,6 +10,7 @@ import com.customcontentengine.domain.mining.MiningSpeed;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -71,6 +72,10 @@ public final class MiningSessionService {
         return repository.findByActorKey(actorKey);
     }
 
+    public List<MiningSession> activeSessions() {
+        return repository.findAll();
+    }
+
     public Optional<MiningSession> cancelSession(String actorKey) {
         Objects.requireNonNull(actorKey, "actorKey");
         return repository.remove(actorKey);
@@ -119,6 +124,17 @@ public final class MiningSessionService {
         }
 
         return ProcessResult.inProgress(session, progress, currentStage, visualStageChanged);
+    }
+
+    public MiningRuntimeUpdate processSessionForRuntime(String actorKey, long nowMillis) {
+        ProcessResult result = processSession(actorKey, nowMillis);
+        if (result.session().isEmpty()) {
+            return MiningRuntimeUpdate.noSession();
+        }
+        if (result.completed()) {
+            return MiningRuntimeUpdate.completed(result.progress(), result.visualStage(), result.visualStageChanged());
+        }
+        return MiningRuntimeUpdate.inProgress(result.progress(), result.visualStage(), result.visualStageChanged());
     }
 
     public static final class ProcessResult {

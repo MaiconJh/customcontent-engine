@@ -2,6 +2,7 @@ package com.customcontentengine.application.mining;
 
 import com.customcontentengine.domain.mining.MiningSession;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,6 +14,11 @@ public final class InMemoryMiningSessionRepository implements MiningSessionRepos
     public Optional<MiningSession> findByActorKey(String actorKey) {
         Objects.requireNonNull(actorKey, "actorKey");
         return Optional.ofNullable(sessions.get(actorKey));
+    }
+
+    @Override
+    public List<MiningSession> findAll() {
+        return List.copyOf(sessions.values());
     }
 
     @Override

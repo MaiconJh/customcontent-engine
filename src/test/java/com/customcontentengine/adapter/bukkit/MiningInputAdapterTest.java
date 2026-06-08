@@ -23,6 +23,8 @@ import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.ItemMetadataPort;
+import com.customcontentengine.port.MiningVisualPort;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,6 +98,7 @@ class MiningInputAdapterTest {
     @Test
     void blockDamageAbortCancelsSessionForSameTarget() {
         MiningSessionService service = service();
+        CapturingVisualPort visual = new CapturingVisualPort();
         service.startSession(
                 ACTOR_KEY,
                 TARGET,
@@ -107,16 +110,19 @@ class MiningInputAdapterTest {
                 registryWithMining(),
                 new FixedBlockStore(Optional.of((short) 1)),
                 new FixedItemMetadataPort(Optional.of(TOOL_ID)),
-                service);
+                service,
+                visual);
 
         adapter.onBlockDamageAbort(blockDamageAbortEventAt(TARGET));
 
         assertFalse(service.getActiveSession(ACTOR_KEY).isPresent());
+        assertEquals(List.of(ACTOR_KEY), visual.clears);
     }
 
     @Test
     void playerQuitClearsSession() {
         MiningSessionService service = service();
+        CapturingVisualPort visual = new CapturingVisualPort();
         service.startSession(
                 ACTOR_KEY,
                 TARGET,
@@ -128,16 +134,19 @@ class MiningInputAdapterTest {
                 registryWithMining(),
                 new FixedBlockStore(Optional.of((short) 1)),
                 new FixedItemMetadataPort(Optional.of(TOOL_ID)),
-                service);
+                service,
+                visual);
 
         adapter.onPlayerQuit(playerQuitEvent());
 
         assertFalse(service.getActiveSession(ACTOR_KEY).isPresent());
+        assertEquals(List.of(ACTOR_KEY), visual.clears);
     }
 
     @Test
     void heldItemChangeCancelsSessionWhenToolChanges() {
         MiningSessionService service = service();
+        CapturingVisualPort visual = new CapturingVisualPort();
         service.startSession(
                 ACTOR_KEY,
                 TARGET,
@@ -149,11 +158,13 @@ class MiningInputAdapterTest {
                 registryWithMining(),
                 new FixedBlockStore(Optional.of((short) 1)),
                 new FixedItemMetadataPort(Optional.of(new CustomItemId("ruby"))),
-                service);
+                service,
+                visual);
 
         adapter.onPlayerItemHeld(playerItemHeldEvent());
 
         assertFalse(service.getActiveSession(ACTOR_KEY).isPresent());
+        assertEquals(List.of(ACTOR_KEY), visual.clears);
     }
 
     private static MiningInputAdapter adapter(
@@ -161,7 +172,16 @@ class MiningInputAdapterTest {
             BlockStorePort blockStore,
             ItemMetadataPort<ItemStack> itemMetadata,
             MiningSessionService service) {
-        return new MiningInputAdapter(registry, blockStore, itemMetadata, service, () -> 1000L);
+        return adapter(registry, blockStore, itemMetadata, service, new CapturingVisualPort());
+    }
+
+    private static MiningInputAdapter adapter(
+            DefinitionRegistry registry,
+            BlockStorePort blockStore,
+            ItemMetadataPort<ItemStack> itemMetadata,
+            MiningSessionService service,
+            MiningVisualPort visualPort) {
+        return new MiningInputAdapter(registry, blockStore, itemMetadata, service, visualPort, () -> 1000L);
     }
 
     private static MiningSessionService service() {
@@ -292,6 +312,22 @@ class MiningInputAdapterTest {
         @Override
         public Optional<CustomItemId> readCustomItemIdentity(ItemStack item) {
             return itemId;
+        }
+    }
+
+    private static final class CapturingVisualPort implements MiningVisualPort {
+        private final List<String> clears = new ArrayList<>();
+
+        @Override
+        public void updateMiningStage(
+                String actorKey,
+                WorldPosition position,
+                com.customcontentengine.domain.mining.MiningStage stage) {
+        }
+
+        @Override
+        public void clearMiningVisual(String actorKey) {
+            clears.add(actorKey);
         }
     }
 }
