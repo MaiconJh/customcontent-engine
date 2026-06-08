@@ -26,6 +26,7 @@ All heavy validation happens in GitHub Actions. Local scripts are only diagnosti
 
 `scripts/ci/collect-project-context.js` collects these files when they exist:
 
+- `docs/AI_CONTEXT_PACK.md`
 - `docs/PROJECT_SCOPE.md`
 - `docs/ARCHITECTURE_GUARDRAILS.md`
 - `docs/adr/*.md`
@@ -49,6 +50,19 @@ Each collected item has:
 ```
 
 The collector preserves file paths, limits total payload size, limits per-file size, truncates long files with a clear marker, sanitizes content, rejects binary files, and skips ignored/local-sensitive areas such as `.env`, `.env.*`, `.dev.vars`, `node_modules`, `.gradle`, `.kilo`, `.wrangler`, `.vscode`, secrets paths, and build outputs.
+
+### AI Context Pack
+
+`docs/AI_CONTEXT_PACK.md` is collected first when present. It is condensed derived guidance for AI review and governance.
+
+It does not replace the source-of-truth documents:
+
+- `docs/PROJECT_SCOPE.md`
+- `docs/ARCHITECTURE_GUARDRAILS.md`
+- `docs/adr/*.md`
+- `docs/milestones/*.md`
+
+If `AI_CONTEXT_PACK.md` conflicts with project scope, architecture guardrails, ADRs, or milestones, the original source documents win. Governance review must treat the context pack as useful context, not as an authority stronger than ADRs or the primary scope documents.
 
 ## Initial AI Report
 

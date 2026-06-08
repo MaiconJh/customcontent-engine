@@ -33,22 +33,25 @@ function isIgnoredByPolicy(file) {
 }
 
 function candidates() {
-  const staticFiles = [
+  const primaryDocs = [
+    "docs/AI_CONTEXT_PACK.md",
     "docs/PROJECT_SCOPE.md",
     "docs/ARCHITECTURE_GUARDRAILS.md",
-    "README.md",
-    "src/main/resources/plugin.yml",
-    "src/main/resources/definitions.yml",
-    ".github/workflows/build-test.yml",
-    ".github/workflows/ci-ai-review.yml",
-    "build.gradle.kts",
-    "settings.gradle.kts",
   ];
-  const globbed = [
+  const generatedDocs = [
     ...listMarkdown("docs/adr"),
     ...listMarkdown("docs/milestones"),
   ];
-  return [...staticFiles, ...globbed]
+  const supportingFiles = [
+    "README.md",
+    "src/main/resources/plugin.yml",
+    "src/main/resources/definitions.yml",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    ".github/workflows/build-test.yml",
+    ".github/workflows/ci-ai-review.yml",
+  ];
+  return [...primaryDocs, ...generatedDocs, ...supportingFiles]
     .map(normalizePath)
     .filter((file, index, all) => all.indexOf(file) === index)
     .filter((file) => !isIgnoredByPolicy(file) && fs.existsSync(file) && fs.statSync(file).isFile() && !isBinaryFile(file));
