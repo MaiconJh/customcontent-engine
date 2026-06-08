@@ -89,6 +89,30 @@ export function validateIssuePlanPayload(value: unknown, env: Env): Record<strin
   return payload;
 }
 
+export function validateImplementationPayload(value: unknown, env: Env): Record<string, unknown> {
+  if (!value || typeof value !== "object") throw new SecurityError("BAD_REQUEST", "Payload must be an object.", 400);
+  const payload = value as Record<string, unknown>;
+  if (!isRepositoryAllowed(String(payload.repository || ""), env)) throw new SecurityError("FORBIDDEN", "Repository is not allowed.", 403);
+  for (const key of ["repository", "issueTitle", "issueBody", "approvedPlanComment", "planningArtifactContent"]) {
+    if (typeof payload[key] !== "string") throw new SecurityError("BAD_REQUEST", `${key} is required.`, 400);
+  }
+  if (typeof payload.issueNumber !== "number") throw new SecurityError("BAD_REQUEST", "issueNumber is required.", 400);
+  if (!Array.isArray(payload.issueLabels) || !payload.issueLabels.every((label) => typeof label === "string")) {
+    throw new SecurityError("BAD_REQUEST", "issueLabels must be a string array.", 400);
+  }
+  if (typeof payload.maxFilesChanged !== "number" || payload.maxFilesChanged < 0 || payload.maxFilesChanged > 50) {
+    throw new SecurityError("BAD_REQUEST", "maxFilesChanged must be a number between 0 and 50.", 400);
+  }
+  if (typeof payload.maxDiffLines !== "number" || payload.maxDiffLines < 0 || payload.maxDiffLines > 5000) {
+    throw new SecurityError("BAD_REQUEST", "maxDiffLines must be a number between 0 and 5000.", 400);
+  }
+  if (typeof payload.dryRun !== "boolean") throw new SecurityError("BAD_REQUEST", "dryRun is required.", 400);
+  if (payload.projectContext !== undefined && !isValidProjectContext(payload.projectContext)) {
+    throw new SecurityError("BAD_REQUEST", "projectContext must be an array of path/content objects.", 400);
+  }
+  return payload;
+}
+
 function isValidProjectContext(value: unknown): value is ProjectContextFile[] {
   return Array.isArray(value)
     && value.length <= 80

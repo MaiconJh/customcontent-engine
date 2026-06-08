@@ -232,6 +232,22 @@ The PR is a controlled handoff artifact only. It must not edit Java, YAML defini
 
 The handoff file records the issue title, issue URL, source labels, approved plan snapshot, implementation checklist, validation checklist, non-goals, and human review requirement. GitHub Actions remains the validation source of truth for any later implementation work.
 
+## AI Draft Implementation Pull Requests
+
+`.github/workflows/ai-draft-implementation-pr.yml` is a manual `workflow_dispatch` workflow for creating an AI draft implementation PR from an approved issue plan.
+
+It requires an issue number and defaults to `dry_run=true`. Dry-run mode calls the Worker, prints the proposed files, summary, safety notes, and safety-gate result, but does not create a branch, write files, or open a pull request.
+
+Write mode (`dry_run=false`) creates or updates `ai/draft-implementation-issue-<issue-number>`, applies only safety-approved edits, writes `docs/ai-implementation-notes/issue-<issue-number>.md`, commits `AI draft implementation for issue #<issue-number>`, pushes the branch, and opens or updates a draft PR.
+
+The workflow never runs from issue labels. It must not commit directly to `main`, must not auto-merge, and must not bypass GitHub Actions. The PR body states that it was generated as an AI draft implementation, requires human review, and must not be auto-merged.
+
+The implementation script refuses to continue when the approved plan is missing, stale, unsafe, out of scope, over the configured file/diff limits, or when the Worker output is invalid.
+
+Forbidden edit targets include `.github/workflows/build-test.yml`, `.github/workflows/**`, `gradle/**`, `gradlew`, `gradlew.bat`, `settings.gradle.kts`, `build.gradle.kts`, `docs/PROJECT_SCOPE.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, `docs/adr/**`, `docs/milestones/**`, `cloudflare/**`, and `scripts/ci/**`. `README.md` is allowed only when explicitly part of the approved plan.
+
+Architecture guardrails still apply: no Bukkit/Paper/NMS/YAML/PDC/adapter dependency in domain, no adapter/Bukkit/Paper/Folia dependency in application, no reflection, no NMS, no ServiceLoader, no `runAsync`, no `runOnEntity`, no `SchedulerAccess`, no fake Bukkit completion events, no global runtime scans, and no `folia-supported: true` without documented validation.
+
 ## Fallback Behavior
 
 If Kilo does not return a usable response, the Worker uses local fallback. The fallback is in English and considers basic documentation-sensitive signals, including:

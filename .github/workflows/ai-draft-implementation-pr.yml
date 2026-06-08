@@ -1,0 +1,60 @@
+name: AI Draft Implementation PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Approved issue number to implement as an AI draft.
+        required: true
+        type: string
+      max_files_changed:
+        description: Maximum changed files allowed, including implementation notes.
+        required: false
+        default: "8"
+        type: string
+      max_diff_lines:
+        description: Maximum changed diff lines allowed.
+        required: false
+        default: "600"
+        type: string
+      dry_run:
+        description: Preview the proposal without creating a branch or PR.
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+
+jobs:
+  draft-implementation-pr:
+    name: Create AI draft implementation PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Create AI draft implementation PR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF: ${{ github.ref }}
+          TARGET_BRANCH: main
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+          MAX_FILES_CHANGED: ${{ github.event.inputs.max_files_changed }}
+          MAX_DIFF_LINES: ${{ github.event.inputs.max_diff_lines }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CI_AI_WORKER_URL: ${{ vars.CI_AI_WORKER_URL }}
+          CI_WORKER_SHARED_SECRET: ${{ secrets.CI_WORKER_SHARED_SECRET }}
+          CI_AI_WORKER_TIMEOUT_MS: "120000"
+        run: node scripts/ci/create-ai-draft-implementation-pr.js
