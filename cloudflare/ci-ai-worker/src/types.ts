@@ -6,6 +6,8 @@ export interface Env {
   RATE_LIMIT_MAX_REQUESTS?: string;
   REQUIRE_SHARED_SECRET?: string;
   CI_WORKER_SHARED_SECRET?: string;
+  CI_AI_SINGLE_PROVIDER_CALL?: string;
+  CI_AI_MAX_PAYLOAD_CHARS?: string;
   KILO_ENDPOINT?: string;
   KILO_BASE_URL?: string;
   KILO_CHAT_COMPLETIONS_PATH?: string;
@@ -14,6 +16,11 @@ export interface Env {
   KILO_SECOND_FALLBACK_MODEL?: string;
   KILO_TIMEOUT_MS?: string;
   KILO_API_KEY?: string;
+  ANALYZE_DIFF_MAX_PROVIDER_CHARS?: string;
+  FAILURE_ANALYSIS_MAX_PROVIDER_CHARS?: string;
+  ISSUE_PLAN_MAX_PROVIDER_CHARS?: string;
+  IMPLEMENT_ISSUE_MAX_PROVIDER_CHARS?: string;
+  GOVERNANCE_MAX_PROVIDER_CHARS?: string;
 }
 
 export type AnalysisType = "failure" | "diff" | "governance";

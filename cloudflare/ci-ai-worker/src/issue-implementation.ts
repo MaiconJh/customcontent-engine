@@ -1,6 +1,6 @@
 import type { Env, ProjectContextFile } from "./types";
+import { buildCompactImplementIssueInput } from "./compact-provider-input";
 import { callKiloChatCompletion } from "./providers/kilo";
-import { maxModelInputChars } from "./security";
 import { sanitizeText } from "./sanitizer";
 
 export interface ImplementIssuePayload {
@@ -77,7 +77,10 @@ export async function proposeIssueImplementation(payload: ImplementIssuePayload,
     return localImplementationFallback(payload, "approved issue plan failed scope guardrails", scopeRisk);
   }
 
-  const prompt = buildImplementationPrompt(payload, env);
+  const prompt = buildCompactImplementIssueInput(payload, env);
+  if (!prompt.withinLimit) {
+    return localImplementationFallback(payload, `compact provider input exceeded ${prompt.endpoint} limit`, scopeRisk);
+  }
   const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
   if (!provider.ok || !provider.text) {
     return localImplementationFallback(payload, provider.error || "empty response", scopeRisk);
@@ -95,86 +98,6 @@ export async function proposeIssueImplementation(payload: ImplementIssuePayload,
   }
 
   return response;
-}
-
-function buildImplementationPrompt(payload: ImplementIssuePayload, env: Env): { system: string; user: string } {
-  const limit = maxModelInputChars(env);
-  return {
-    system: `You are a controlled AI implementation proposer for CustomContent Engine.
-Return JSON only.
-Do not produce Markdown outside JSON.
-Do not edit main.
-Do not auto-merge.
-Do not recommend local Gradle, Maven, javac, or local Java tests.
-Propose only small fileEdits that are directly traceable to the approved issue plan.
-If no safe implementation is obvious, return an empty fileEdits array.`,
-    user: sanitizeText(`Repository: ${payload.repository}
-Issue: #${payload.issueNumber}
-Issue title: ${payload.issueTitle}
-Issue URL: ${payload.issueUrl || ""}
-Issue labels: ${payload.issueLabels.join(", ")}
-Dry run: ${payload.dryRun}
-Max files changed: ${payload.maxFilesChanged}
-Max diff lines: ${payload.maxDiffLines}
-
-Issue body:
-${payload.issueBody}
-
-Approved plan comment:
-${payload.approvedPlanComment}
-
-Approved planning artifact (${payload.planningArtifactPath || "unknown"}):
-${payload.planningArtifactContent}
-
-Project documentation context:
-${formatProjectContext(payload.projectContext || [])}
-
-Allowed implementation paths:
-- src/main/java/**
-- src/main/resources/**
-- src/test/java/**
-- src/integrationTest/**
-- docs/ai-implementation-notes/** only when relevant
-
-Forbidden paths:
-- .github/workflows/build-test.yml
-- gradle/**
-- gradlew
-- gradlew.bat
-- settings.gradle.kts
-- build.gradle.kts
-- docs/PROJECT_SCOPE.md
-- docs/ARCHITECTURE_GUARDRAILS.md
-- docs/adr/**
-- docs/milestones/**
-- cloudflare/**
-- scripts/ci/**
-- .github/workflows/**
-- README.md unless explicitly part of the approved plan
-
-Architecture guardrails:
-- domain has no Bukkit, Paper, NMS, YAML, PDC, or adapter dependency.
-- application has no adapter, Bukkit, Paper, or Folia dependency.
-- builtin mechanics do not depend on adapters, registries, schedulers, or services.
-- no reflection.
-- no NMS.
-- no ServiceLoader.
-- no runAsync, runOnEntity, or SchedulerAccess.
-- no fake Bukkit events for custom mining completion.
-- no global scans over worlds, chunks, blocks, or players.
-- Folia is objective only; never add folia-supported true.
-
-Return exactly this JSON shape:
-{
-  "summary": "short summary",
-  "proposedFiles": ["src/..."],
-  "fileEdits": [
-    { "path": "src/...", "content": "complete UTF-8 file content" }
-  ],
-  "safetyNotes": ["..."],
-  "validationNotes": ["GitHub Actions build/test/integrationTest", "CI AI Governance Bot"]
-}`, limit),
-  };
 }
 
 function localImplementationFallback(payload: ImplementIssuePayload, reason: string, extraSafetyNotes: string[] = []): ImplementIssueResponse {
@@ -288,14 +211,6 @@ function outOfScopeRisks(payload: ImplementIssuePayload): string[] {
 
 function estimatedDiffLines(edits: FileEdit[]): number {
   return edits.reduce((sum, edit) => sum + edit.content.split(/\r?\n/).length, 0);
-}
-
-function formatProjectContext(files: ProjectContextFile[]): string {
-  if (!files.length) return "No project documentation context was provided.";
-  return files
-    .slice(0, 80)
-    .map((file) => `--- ${file.path}${file.truncated ? " [TRUNCATED]" : ""} ---\n${file.content}`)
-    .join("\n\n");
 }
 
 function stringArray(value: unknown): string[] {

@@ -1,5 +1,5 @@
 import type { AnalyzePayload, Env, Finding, GovernancePayload, GovernanceReview, PublishDecision } from "./types";
-import { buildGovernancePrompt, buildPrompt } from "./prompt-builder";
+import { buildCompactAnalyzeInput, buildCompactGovernanceInput } from "./compact-provider-input";
 import { checkRateLimit } from "./rate-limit";
 import { callKiloChatCompletion } from "./providers/kilo";
 import { formatGithubMarkdown, normalizeFindings } from "./formatters/github";
@@ -62,8 +62,13 @@ export default {
 };
 
 export async function analyze(payload: AnalyzePayload, env: Env) {
-  const prompt = buildPrompt(payload, env);
-  const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
+  const prompt = buildCompactAnalyzeInput(payload, env);
+  let provider = { ok: false, error: `compact provider input exceeded ${prompt.endpoint} limit` } as Awaited<ReturnType<typeof callKiloChatCompletion>>;
+  if (prompt.withinLimit) {
+    provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
+  } else {
+    console.warn(`AI provider skipped: endpoint=${prompt.endpoint} providerInputChars=${prompt.chars} providerInputLimit=${prompt.limit} fallbackReason=${provider.error}`);
+  }
   const initialFallback = !provider.ok || !provider.text;
   let fallbackReason = initialFallback ? provider.error || "empty response" : undefined;
   if (initialFallback) {
@@ -107,7 +112,10 @@ export async function governanceReview(payload: GovernancePayload, env: Env): Pr
   if (!payload.initialReport.trim()) {
     return localGovernance(payload, "initial report was empty");
   }
-  const prompt = buildGovernancePrompt(payload, env);
+  const prompt = buildCompactGovernanceInput(payload, env);
+  if (!prompt.withinLimit) {
+    return localGovernance(payload, `compact provider input exceeded ${prompt.endpoint} limit`);
+  }
   const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
   if (!provider.ok || !provider.text) {
     return localGovernance(payload, provider.error || "empty response");

@@ -1,6 +1,6 @@
 import type { AiContextPackDrift, Env, ProjectContextFile } from "./types";
+import { buildCompactIssuePlanInput } from "./compact-provider-input";
 import { callKiloChatCompletion } from "./providers/kilo";
-import { maxModelInputChars } from "./security";
 import { sanitizeText } from "./sanitizer";
 
 const REQUIRED_SECTIONS = [
@@ -107,8 +107,11 @@ const SCOPE_GUARDRAILS: ScopeGuardrail[] = [
 
 export async function planIssue(payload: IssuePlanPayload, env: Env): Promise<IssuePlanResponse> {
   const safetyNotes = scopeGuardrailNotes(payload);
-  const { system, user } = buildIssuePlanningPrompt(payload, env, safetyNotes);
-  const provider = await callKiloChatCompletion(env, system, user);
+  const prompt = buildCompactIssuePlanInput(payload, env, safetyNotes);
+  if (!prompt.withinLimit) {
+    return localIssuePlan(payload, `compact provider input exceeded ${prompt.endpoint} limit`, safetyNotes);
+  }
+  const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
 
   if (!provider.ok || !provider.text) {
     return localIssuePlan(payload, provider.error || "empty response", safetyNotes);
@@ -216,61 +219,6 @@ This plan is advisory only. A maintainer must review the request, approve the sc
   };
 }
 
-function buildIssuePlanningPrompt(payload: IssuePlanPayload, env: Env, safetyNotes: string[]): { system: string; user: string } {
-  const limit = maxModelInputChars(env);
-  return {
-    system: `You are an issue-driven AI planning assistant for CustomContent Engine.
-You only produce an advisory implementation plan.
-Do not edit code.
-Do not claim that you opened a pull request.
-Do not claim that you committed changes.
-Do not auto-merge anything.
-Do not recommend local Gradle validation.
-Use English only.
-Use repository documentation as scope authority.
-GitHub Actions is the validation source of truth.`,
-    user: sanitizeText(`Repository: ${payload.repository}
-Issue: #${payload.issueNumber}
-Issue title: ${payload.issueTitle}
-Issue author: ${payload.issueAuthor || "unknown"}
-Issue URL: ${payload.issueUrl || ""}
-Issue labels: ${payload.issueLabels.join(", ")}
-
-Issue body:
-${payload.issueBody}
-
-Repository documentation context:
-${formatProjectContext(payload.projectContext || [])}
-
-AI context pack drift signal:
-${formatDriftSignal(payload.aiContextPackDrift)}
-
-Local scope guardrail signals:
-${safetyNotes.length ? safetyNotes.map((note) => `- ${note}`).join("\n") : "No explicit local guardrail signal detected."}
-
-Create an advisory implementation plan only. It must contain exactly these sections:
-
-# AI Implementation Plan
-## Request Summary
-## Scope Classification
-## Source-of-Truth Alignment
-## Likely Files or Areas
-## Proposed Steps
-## Acceptance Criteria
-## Validation
-## Risks
-## Explicit Non-Goals
-## Human Review Required
-
-Scope guardrails:
-- Strongly warn or classify as out of scope/requires ADR if the issue asks for economy systems, quest systems, generic combat systems, GUI/menu frameworks, scripting languages, generic ability frameworks, land protection, NMS/reflection, direct Bukkit/Paper usage in domain/application layers, declaring folia-supported true without validation, or changing accepted ADRs without a new ADR.
-- Source-of-truth documents win over AI_CONTEXT_PACK.md if they conflict.
-- Do not invent exact files unless the issue or documentation clearly supports them.
-- Validation must only mention remote GitHub Actions build/test/integrationTest and CI AI Governance Bot.
-- State clearly that the plan is advisory and requires maintainer review.`, limit),
-  };
-}
-
 function normalizePlan(text: string, payload: IssuePlanPayload, safetyNotes: string[]): string {
   let plan = sanitizeText(text.trim(), 24000);
   if (!plan.startsWith("# AI Implementation Plan")) {
@@ -339,23 +287,6 @@ function likelyAreasFromIssue(payload: IssuePlanPayload): string[] {
   if (/plugin\.yml|definition|yaml/.test(text)) areas.push("Plugin/resource metadata, subject to architecture guardrails.");
   if (/command|permission|recipe|content|definition/.test(text)) areas.push("Custom content definition flow, subject to documented scope.");
   return areas;
-}
-
-function formatProjectContext(files: ProjectContextFile[]): string {
-  if (!files.length) return "No project documentation context was provided.";
-  return files
-    .slice(0, 80)
-    .map((file) => `--- ${file.path}${file.truncated ? " [TRUNCATED]" : ""} ---\n${file.content}`)
-    .join("\n\n");
-}
-
-function formatDriftSignal(signal: AiContextPackDrift | undefined): string {
-  if (!signal) return "No AI context pack drift signal was provided.";
-  return JSON.stringify({
-    driftRisk: signal.driftRisk,
-    message: signal.message,
-    changedSourceDocs: signal.changedSourceDocs,
-  }, null, 2);
 }
 
 function sanitizeInline(value: string): string {
