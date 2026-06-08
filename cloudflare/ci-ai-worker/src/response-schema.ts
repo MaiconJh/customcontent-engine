@@ -1,7 +1,7 @@
-import type { AnalyzeResponse, ErrorResponse, Finding } from "./types";
+import type { AnalyzeResponse, ErrorResponse, Finding, GovernanceVerdict } from "./types";
 import { sanitizeText } from "./sanitizer";
 
-export function okResponse(type: "failure" | "diff", markdown: string, findings: Finding[] = [], fallback = false): AnalyzeResponse {
+export function okResponse(type: "failure" | "diff", markdown: string, findings: Finding[] = [], fallback = false, governance?: GovernanceVerdict): AnalyzeResponse {
   const safeMarkdown = sanitizeText(markdown, 12000);
   return {
     ok: true,
@@ -17,6 +17,7 @@ export function okResponse(type: "failure" | "diff", markdown: string, findings:
       snippet: finding.snippet ? sanitizeText(finding.snippet, 800) : undefined,
     })),
     fallback,
+    governance,
   };
 }
 

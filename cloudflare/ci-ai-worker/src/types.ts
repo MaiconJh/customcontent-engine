@@ -6,6 +6,7 @@ export interface Env {
   RATE_LIMIT_MAX_REQUESTS?: string;
   REQUIRE_SHARED_SECRET?: string;
   CI_WORKER_SHARED_SECRET?: string;
+  KILO_ENDPOINT?: string;
   KILO_BASE_URL?: string;
   KILO_CHAT_COMPLETIONS_PATH?: string;
   KILO_MODEL?: string;
@@ -14,7 +15,7 @@ export interface Env {
   KILO_API_KEY?: string;
 }
 
-export type AnalysisType = "failure" | "diff";
+export type AnalysisType = "failure" | "diff" | "governance";
 export type EventType = "push" | "pull_request" | "workflow_dispatch";
 export type Severity = "info" | "warning" | "error";
 
@@ -27,7 +28,15 @@ export interface BasePayload {
   workflow: string;
   run_id: string;
   run_url: string;
+  ciLogs?: string;
+  projectContext?: ProjectContextFile[];
   metadata?: Record<string, unknown>;
+}
+
+export interface ProjectContextFile {
+  path: string;
+  content: string;
+  truncated?: boolean;
 }
 
 export interface FailurePayload extends BasePayload {
@@ -43,6 +52,13 @@ export interface DiffPayload extends BasePayload {
 }
 
 export type AnalyzePayload = FailurePayload | DiffPayload;
+
+export interface GovernancePayload extends BasePayload {
+  type: "governance";
+  diff?: string;
+  log?: string;
+  report: string;
+}
 
 export interface Finding {
   severity: Severity;
@@ -60,6 +76,16 @@ export interface AnalyzeResponse {
   markdown: string;
   findings: Finding[];
   fallback?: boolean;
+  governance?: GovernanceVerdict;
+}
+
+export interface GovernanceVerdict {
+  publishDecision: "publish" | "publish_with_caution" | "suppress" | "fallback";
+  confidence: "high" | "medium" | "low";
+  verdict: string;
+  unsupportedClaims: string[];
+  documentationConflicts: string[];
+  recommendedIssueBody: string;
 }
 
 export interface ErrorResponse {

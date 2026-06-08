@@ -33,5 +33,5 @@ security:
 build:
   java_version: auto
   tool: auto
-  gradle_command: ./gradlew clean build --no-daemon
+  gradle_command: ./gradlew clean build integrationTest --no-daemon
   maven_command: mvn -B clean verify

@@ -36,6 +36,16 @@ function headers() {
 }
 
 function payload(type) {
+  const projectContext = [
+    {
+      path: "docs/PROJECT_SCOPE.md",
+      content: "The project scope is conservative. Public API is not stable. Advanced Folia support is not promised.",
+    },
+    {
+      path: "docs/ARCHITECTURE_GUARDRAILS.md",
+      content: "Domain code must not depend on Bukkit, Paper, Folia, YAML, PDC, NMS, or adapter implementation details.",
+    },
+  ];
   const base = {
     repository: "MaiconJh/customcontent-engine",
     event: "workflow_dispatch",
@@ -44,12 +54,15 @@ function payload(type) {
     workflow: "local-worker-api-test",
     run_id: "local",
     run_url: "https://github.com/MaiconJh/customcontent-engine/actions",
+    ciLogs: "GitHub Actions build-test result: success.",
+    projectContext,
     metadata: { source: "scripts/ci/test-worker-api.js" },
   };
   if (type === "failure") {
     return {
       ...base,
       type,
+      ciLogs: "BUILD FAILED\nExecution failed for task ':test'.\nThere were failing tests.",
       log: "BUILD FAILED\nExecution failed for task ':test'.\nThere were failing tests.",
     };
   }
@@ -74,7 +87,7 @@ function payload(type) {
 function summarize(name, result) {
   const body = result.body || {};
   const suffix = body.ok
-    ? `ok=true fallback=${Boolean(body.fallback)} summary="${String(body.summary || "").slice(0, 120)}"`
+    ? `ok=true fallback=${Boolean(body.fallback)} decision=${body.governance?.publishDecision || "n/a"} summary="${String(body.summary || "").slice(0, 120)}"`
     : `ok=false error=${body.error?.code || "UNKNOWN"} message="${body.error?.message || "No JSON body"}"`;
   console.log(`${name}: HTTP ${result.status} ${suffix}`);
 }

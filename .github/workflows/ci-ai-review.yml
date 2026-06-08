@@ -1,4 +1,4 @@
-name: CI AI Review Bot
+name: CI AI Governance Bot
 
 on:
   push:
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run build and tests
+      - name: Run GitHub Actions build/test/integrationTest
         id: build
         run: |
           chmod +x scripts/ci/run-build.sh
@@ -81,11 +81,16 @@ jobs:
           chmod +x scripts/ci/collect-diff.sh
           scripts/ci/collect-diff.sh
 
+      - name: Collect project documentation context
+        run: node scripts/ci/collect-project-context.js --output project-context.json
+
       - name: Analyze diff with Worker
         id: analyze
         continue-on-error: true
+        env:
+          CI_BUILD_RESULT: ${{ needs.build-test.result }}
         run: |
-          node scripts/ci/call-worker.js --type diff --input-file diff.patch --output-file ai-response.json --markdown-file ai-response.md --findings-file ai-findings.json
+          node scripts/ci/call-worker.js --type diff --input-file diff.patch --context-file project-context.json --output-file ai-response.json --markdown-file ai-response.md --findings-file ai-findings.json
 
       - name: Extract PR number
         if: github.event_name == 'pull_request'
@@ -126,9 +131,14 @@ jobs:
       - name: Sanitize build log
         run: node scripts/ci/sanitize-payload.js --input build.log --output build.sanitized.log --max-chars 50000 --text
 
+      - name: Collect project documentation context
+        run: node scripts/ci/collect-project-context.js --output project-context.json
+
       - name: Analyze failure with Worker
         continue-on-error: true
-        run: node scripts/ci/call-worker.js --type failure --input-file build.sanitized.log --output-file failure-response.json --markdown-file failure-response.md
+        env:
+          CI_BUILD_RESULT: ${{ needs.build-test.result }}
+        run: node scripts/ci/call-worker.js --type failure --input-file build.sanitized.log --ci-logs-file build.sanitized.log --context-file project-context.json --output-file failure-response.json --markdown-file failure-response.md
 
       - name: Create or update CI failure issue
         continue-on-error: true

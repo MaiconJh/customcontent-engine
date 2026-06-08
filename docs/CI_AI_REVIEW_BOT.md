@@ -1,57 +1,148 @@
-# CI AI Review Bot
+# CI AI Governance Bot
 
 ## What It Is
 
-CI AI Review Bot is an internal mini-platform that runs build/test checks, analyzes failures, analyzes diffs, creates failure issues, and comments on pull requests. GitHub Actions collects sanitized logs and diffs, Cloudflare Worker acts as the secure middle layer, and Kilo Gateway is used as a configurable OpenAI-compatible provider.
+CI AI Governance Bot is a documentation-driven review layer for this repository. It does not replace GitHub Actions and it does not ask maintainers to run local Gradle validation. GitHub Actions is the source of truth for build, test, and integrationTest results.
+
+The bot collects the git diff, GitHub Actions result/logs, and relevant repository documentation, sends that context to the Cloudflare Worker, asks Kilo Code for an initial report, and then runs a governance/interceptor review that checks whether the report is relevant, factual, and aligned with the documented project scope.
 
 ## Architecture
 
 ```text
 GitHub Actions
--> build/test
--> sanitize logs/diff
+-> build/test/integrationTest on GitHub-hosted runner
+-> collect diff, CI logs, and project documentation context
+-> sanitize payload
 -> Cloudflare Worker
--> Kilo Gateway
+-> Kilo Gateway initial report
+-> Kilo Gateway governance review
 -> Markdown response
 -> GitHub issue/comment
 ```
 
-The Worker also includes a regex-based local fallback when the provider is unavailable.
+All heavy validation happens in GitHub Actions. Local scripts are only diagnostics and payload collectors; they do not call Gradle, Maven, Java, or repository tests.
 
-## Created Files
+## Documentation Context
 
+`scripts/ci/collect-project-context.js` collects these files when they exist:
+
+- `docs/PROJECT_SCOPE.md`
+- `docs/ARCHITECTURE_GUARDRAILS.md`
+- `docs/adr/*.md`
+- `docs/milestones/*.md`
+- `README.md`
+- `src/main/resources/plugin.yml`
+- `src/main/resources/definitions.yml`
+- `.github/workflows/build-test.yml`
 - `.github/workflows/ci-ai-review.yml`
-- `.github/ai-review/config.yml`
-- `scripts/ci/run-build.sh`
-- `scripts/ci/collect-diff.sh`
-- `scripts/ci/sanitize-payload.js`
-- `scripts/ci/call-worker.js`
-- `scripts/ci/create-or-update-comment.js`
-- `scripts/ci/create-or-update-issue.js`
-- `scripts/ci/create-or-update-push-note.js`
-- `scripts/ci/github-api.js`
-- `scripts/ci/test-worker-api.js`
-- `scripts/ci/test-kilo-api.js`
-- `cloudflare/ci-ai-worker/src/**`
-- `cloudflare/ci-ai-worker/test/**`
+- `build.gradle.kts`
+- `settings.gradle.kts`
 
-## Prepare Cloudflare
+The collector preserves file paths, limits total payload size, truncates long files with a clear marker, sanitizes content, and skips ignored/local-sensitive areas such as `.env`, `.env.*`, `.dev.vars`, `node_modules`, `.gradle`, `.kilo`, `.wrangler`, `.vscode`, and build outputs.
 
-```bash
-cd cloudflare/ci-ai-worker
-npm install
-npx wrangler login
-npm run dev
-npm run deploy
+## Initial AI Report
+
+The Worker asks Kilo Code to review the change using:
+
+1. The git diff.
+2. GitHub Actions result/logs.
+3. Repository documentation context.
+
+The prompt asks the model to determine whether the change is consistent with the documented architecture and scope. It checks for scope violations, guardrail violations, ADR contradictions, forbidden dependencies, local-only validation assumptions, plugin metadata risks, unsupported Folia claims, and behavior not documented by the repository.
+
+The report separates:
+
+- Confirmed findings
+- Possible risks
+- Unsupported claims
+- Documentation divergence
+- Suggested follow-up
+
+The model is instructed not to claim a problem unless it is supported by the diff, CI logs, or documentation context.
+
+## Governance Review
+
+After the first report, the Worker runs a second governance/interceptor review. The governance review receives:
+
+- git diff
+- GitHub Actions result/logs
+- project documentation context
+- first AI report
+
+It checks:
+
+- Is the report relevant?
+- Is the report factually supported?
+- Are there unsupported claims?
+- Did the report miss a major documentation conflict?
+- Did the report overstate a risk?
+- Does the report align with project scope and ADRs?
+- Should the issue/comment be published as-is, published with caution, suppressed, or treated as fallback?
+
+The governance verdict uses this shape:
+
+```json
+{
+  "publishDecision": "publish|publish_with_caution|suppress|fallback",
+  "confidence": "high|medium|low",
+  "verdict": "...",
+  "unsupportedClaims": [],
+  "documentationConflicts": [],
+  "recommendedIssueBody": "..."
+}
 ```
 
-Deploy only after completing the local Wrangler login.
+The GitHub issue/comment includes the initial report and the governance review so maintainers can see both the analysis and the interceptor verdict.
 
-## Configure GitHub Actions
+## GitHub Behavior
 
-Configure values in `Settings -> Secrets and variables -> Actions`.
+For pull requests, the bot creates or updates one deduplicated PR comment using a hidden marker.
 
-Recommended variable:
+For pushes to `main`, the bot creates or updates one deduplicated technical note issue. The body includes hidden commit/run markers so the note remains traceable without creating spam.
+
+For CI failures, the bot creates or reuses a `ci-failure` issue and includes GitHub Actions failure evidence plus governance review.
+
+The bot must never mask a real build/test/integrationTest failure. AI/provider failures are non-blocking; GitHub Actions validation remains authoritative.
+
+## Fallback Behavior
+
+If Kilo does not return a usable response, the Worker uses local fallback. The fallback is in English and considers basic documentation-sensitive signals, including:
+
+- ADR file changes
+- `PROJECT_SCOPE.md` changes
+- `ARCHITECTURE_GUARDRAILS.md` changes
+- forbidden platform imports in domain code
+- `plugin.yml` metadata changes
+- `folia-supported: true` declarations
+- GitHub Actions permission/cache/trigger changes
+
+The fallback governance review also checks for unsupported claims such as local Gradle validation instructions or Folia claims not supported by the diff/documentation context.
+
+## Kilo Provider
+
+Default endpoint and models:
+
+```text
+KILO_ENDPOINT=https://api.kilo.ai/api/gateway/chat/completions
+KILO_MODEL=kilo-auto/free
+KILO_FALLBACK_MODEL=kilo-auto/balanced
+KILO_SECOND_FALLBACK_MODEL=kilo/auto-free
+```
+
+`KILO_API_KEY` is optional. If it is not configured, the Worker does not send an `Authorization` header.
+
+The parser accepts:
+
+- `choices[0].message.content`
+- `choices[0].message.reasoning`
+
+Provider failures are logged only as safe reasons such as `provider status 401`, `provider status 403`, `provider status 404`, `provider status 429`, `empty response`, or timeout-like errors. Tokens, raw sensitive payloads, and `Authorization` are not logged.
+
+## Configuration
+
+Configure GitHub Actions in `Settings -> Secrets and variables -> Actions`.
+
+Required variable:
 
 - `CI_AI_WORKER_URL`: public URL of the deployed Worker.
 
@@ -59,92 +150,34 @@ Optional secret:
 
 - `CI_WORKER_SHARED_SECRET`: used when `REQUIRE_SHARED_SECRET=true` in the Worker.
 
-If `CI_AI_WORKER_URL` is not configured, build/test still runs. Analysis uses a local fallback message and does not mask real CI failures.
+Configure Kilo in the Cloudflare Worker, not in GitHub Actions:
 
-## Use Kilo Without A Token
+- `KILO_API_KEY`: optional Worker secret for authenticated models.
 
-`KILO_API_KEY` is optional. By default, the Worker does not send `Authorization` to Kilo Gateway. The current default model is `kilo-auto/free`, when available for anonymous or limited free usage. For paid or authenticated models, configure `KILO_API_KEY` as a Worker secret/variable, not in GitHub Actions.
-
-## Configure The Worker
-
-Main variables in `wrangler.jsonc`:
-
-- `ALLOWED_REPOSITORIES`
-- `MAX_BODY_BYTES`
-- `MAX_MODEL_INPUT_CHARS`
-- `RATE_LIMIT_WINDOW_SECONDS`
-- `RATE_LIMIT_MAX_REQUESTS`
-- `REQUIRE_SHARED_SECRET`
-- `CI_WORKER_SHARED_SECRET`
-- `KILO_BASE_URL`
-- `KILO_CHAT_COMPLETIONS_PATH`
-- `KILO_MODEL`
-- `KILO_FALLBACK_MODEL`
-- `KILO_SECOND_FALLBACK_MODEL`
-- `KILO_API_KEY`
-
-`ALLOWED_REPOSITORIES` must contain only authorized repositories, separated by commas.
-
-## Manual Testing
-
-Health:
+## Deploy The Worker
 
 ```bash
-curl https://worker-url/health
+cd cloudflare/ci-ai-worker
+npm install
+npx wrangler login
+npm run deploy
 ```
 
-Diff:
+## Test Without Java
+
+Allowed local diagnostics:
 
 ```bash
-curl -X POST https://worker-url/v1/analyze/diff \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type":"diff",
-    "repository":"MaiconJh/customcontent-engine",
-    "event":"pull_request",
-    "branch":"feature/example",
-    "base":"main",
-    "head":"abc123",
-    "commit":"abc123",
-    "workflow":"CI AI Review Bot",
-    "run_id":"1",
-    "run_url":"https://github.com/MaiconJh/customcontent-engine/actions/runs/1",
-    "diff":"diff --git a/README.md b/README.md\n+example",
-    "metadata":{}
-  }'
-```
-
-Failure:
-
-```bash
-curl -X POST https://worker-url/v1/analyze/failure \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type":"failure",
-    "repository":"MaiconJh/customcontent-engine",
-    "event":"push",
-    "branch":"main",
-    "commit":"abc123",
-    "workflow":"CI AI Review Bot",
-    "run_id":"1",
-    "run_url":"https://github.com/MaiconJh/customcontent-engine/actions/runs/1",
-    "log":"BUILD FAILED\nExecution failed for task :test",
-    "metadata":{}
-  }'
-```
-
-If `REQUIRE_SHARED_SECRET=true`, add:
-
-```bash
--H "X-CI-Worker-Secret: value-without-exposing-it"
-```
-
-Local scripts:
-
-```bash
+node --check scripts/ci/*.js
+cd cloudflare/ci-ai-worker
+npm.cmd run typecheck
+npm.cmd test
+cd ../..
 node scripts/ci/test-worker-api.js
 node scripts/ci/test-kilo-api.js
 ```
+
+These diagnostics do not call Gradle, Maven, Java, or repository tests.
 
 ## Security
 
@@ -165,25 +198,16 @@ The bot updates existing PR comments, reuses open failure issues by branch/SHA, 
 
 ## Pull Requests From Forks
 
-The workflow uses `pull_request`, not `pull_request_target`. Secrets are not exposed to forks. If permissions are limited, comment publication may fail without breaking CI. Build/test still runs normally.
+The workflow uses `pull_request`, not `pull_request_target`. Secrets are not exposed to forks. If permissions are limited, comment publication may fail without breaking CI. Build/test/integrationTest still runs in GitHub Actions.
 
 ## Troubleshooting
 
 - Worker not configured: set `CI_AI_WORKER_URL` in Actions variables.
-- Missing `CI_AI_WORKER_URL`: build/test runs and analysis uses fallback.
-- Kilo unavailable: the Worker returns local fallback.
+- Missing `CI_AI_WORKER_URL`: build/test/integrationTest still runs and analysis uses fallback.
+- Kilo unavailable: the Worker returns local fallback plus governance fallback.
 - Invalid model: the provider tries `KILO_FALLBACK_MODEL` and `KILO_SECOND_FALLBACK_MODEL`.
-- "Local fallback was used": the Worker received the payload, but Kilo Gateway returned an error, empty response, timeout, or required authentication. Check `KILO_BASE_URL`, `KILO_CHAT_COMPLETIONS_PATH`, configured models, and configure `KILO_API_KEY` in the Worker if needed.
+- "Local fallback was used": the Worker received the payload, but Kilo Gateway returned an error, empty response, timeout, or required authentication.
 - Rate limited: increase limits carefully or wait for the window to expire.
-- Payload too large: reduce `MAX_DIFF_CHARS` or `MAX_CHARS`, or increase `MAX_BODY_BYTES`.
+- Payload too large: reduce context/diff limits or increase `MAX_BODY_BYTES`.
 - GitHub cannot create issues: check workflow `permissions` and repository/fork policies.
 - Pull request from a fork: comments may be blocked by GitHub permissions, but CI should not fail.
-
-## Next Commands
-
-```bash
-cd cloudflare/ci-ai-worker
-npm install
-npx wrangler login
-npm run deploy
-```

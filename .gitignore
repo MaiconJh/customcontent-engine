@@ -2,8 +2,11 @@
 build/
 
 .env
+.env.*
+.dev.vars
 
 .vscode/
+.wrangler/
 
 node_modules/
 cloudflare/ci-ai-worker/node_modules/

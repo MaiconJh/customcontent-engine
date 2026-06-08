@@ -11,7 +11,9 @@ async function main() {
   const marker = "<!-- ai-ci-review-bot:push-note -->";
   const bodyPath = arg("--body-file", null);
   const labels = (arg("--labels", "automated,ai-analysis") || "").split(",").map((label) => label.trim()).filter(Boolean);
-  const body = `${marker}\n\n${bodyPath ? fs.readFileSync(bodyPath, "utf8") : fs.readFileSync(0, "utf8")}`;
+  const sha = process.env.GITHUB_SHA || "";
+  const runId = process.env.GITHUB_RUN_ID || "";
+  const body = `${marker}\n<!-- ai-ci-review-bot:sha:${sha} -->\n<!-- ai-ci-review-bot:run:${runId} -->\n\n${bodyPath ? fs.readFileSync(bodyPath, "utf8") : fs.readFileSync(0, "utf8")}`;
   const { owner, repo } = repoParts();
   const title = "AI Technical Note: main";
   const issues = await githubRequest(`/repos/${owner}/${repo}/issues?state=open&labels=${encodeURIComponent(labels[0] || "automated")}&per_page=100`);

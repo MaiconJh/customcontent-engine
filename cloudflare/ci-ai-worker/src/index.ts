@@ -1,10 +1,10 @@
-import type { AnalyzePayload, Env, Finding } from "./types";
-import { buildPrompt } from "./prompt-builder";
+import type { AnalyzePayload, Env, Finding, GovernancePayload, GovernanceVerdict } from "./types";
+import { buildGovernancePrompt, buildPrompt } from "./prompt-builder";
 import { checkRateLimit } from "./rate-limit";
 import { callKiloChatCompletion } from "./providers/kilo";
 import { formatGithubMarkdown, normalizeFindings } from "./formatters/github";
 import { errorResponse, okResponse } from "./response-schema";
-import { readJsonBody, SecurityError, validatePayload, validateSharedSecret } from "./security";
+import { readJsonBody, SecurityError, validateGovernancePayload, validatePayload, validateSharedSecret } from "./security";
 import { sanitizeObject } from "./sanitizer";
 
 export default {
@@ -16,10 +16,18 @@ export default {
         return Response.json({ ok: true, service: "ci-ai-worker" });
       }
       if (request.method !== "POST") return errorResponse("BAD_REQUEST", "Unsupported method.", 405);
-      if (!["/v1/analyze/failure", "/v1/analyze/diff"].includes(url.pathname)) {
+      if (!["/v1/analyze/failure", "/v1/analyze/diff", "/v1/analyze/governance"].includes(url.pathname)) {
         return errorResponse("BAD_REQUEST", "Unsupported route.", 404);
       }
       await validateSharedSecret(request, env);
+      if (url.pathname.endsWith("/governance")) {
+        const rawGovernance = await readJsonBody(request, env);
+        const governancePayload = sanitizeObject(validateGovernancePayload(rawGovernance, env), Number(env.MAX_MODEL_INPUT_CHARS || "50000"));
+        if (!checkRateLimit(request, env, url.pathname, governancePayload.repository, governancePayload.event)) {
+          return errorResponse("RATE_LIMITED", "Rate limit exceeded.", 429);
+        }
+        return Response.json({ ok: true, type: "governance", governance: await governanceReview(governancePayload, env) });
+      }
       const expectedType = url.pathname.endsWith("/failure") ? "failure" : "diff";
       const raw = await readJsonBody(request, env);
       const payload = sanitizeObject(validatePayload(raw, expectedType, env), Number(env.MAX_MODEL_INPUT_CHARS || "50000"));
@@ -42,9 +50,35 @@ export async function analyze(payload: AnalyzePayload, env: Env) {
   if (fallback) {
     console.warn(`AI provider fallback used: ${provider.error || "empty response"}`);
   }
-  const markdown = fallback ? localFallback(payload) : provider.text || "";
+  const initialMarkdown = fallback ? localFallback(payload) : provider.text || "";
+  const governance = await governanceReview({
+    ...payload,
+    type: "governance",
+    report: initialMarkdown,
+    diff: payload.type === "diff" ? payload.diff : undefined,
+    log: payload.type === "failure" ? payload.log : undefined,
+  }, env);
+  const markdown = `${initialMarkdown.trim()}
+
+${governance.recommendedIssueBody.trim()}`;
   const findings = payload.type === "diff" ? diffFindings(payload.diff) : failureFindings(payload.log);
-  return okResponse(payload.type, formatGithubMarkdown(payload, markdown, fallback, provider.error || "empty response"), normalizeFindings(findings), fallback);
+  return okResponse(payload.type, formatGithubMarkdown(payload, markdown, fallback, provider.error || "empty response"), normalizeFindings(findings), fallback, governance);
+}
+
+export async function governanceReview(payload: GovernancePayload, env: Env): Promise<GovernanceVerdict> {
+  const prompt = buildGovernancePrompt(payload, env);
+  const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
+  if (!provider.ok || !provider.text) {
+    return localGovernance(payload, provider.error || "empty response");
+  }
+  return {
+    publishDecision: inferPublishDecision(provider.text),
+    confidence: "medium",
+    verdict: firstParagraph(provider.text),
+    unsupportedClaims: extractBullets(provider.text, "Unsupported Claims"),
+    documentationConflicts: extractBullets(provider.text, "Documentation Conflicts"),
+    recommendedIssueBody: provider.text,
+  };
 }
 
 export function localFallback(payload: AnalyzePayload): string {
@@ -76,19 +110,25 @@ Not safely inferred from the sanitized log.
 
 ## Suggested fix
 
-Reproduce locally with the same CI command and fix the first real failure in the log.
+Use the GitHub Actions log as the source of truth and fix the first real failure reported by the remote workflow.
 
 ## Next steps
 
 * Open the build.log artifact.
 * Fix the root cause.
-* Re-run the workflow.`;
+* Re-run the GitHub Actions workflow.`;
   }
 
   const diff = payload.diff;
   const hints = [
     [/build\.gradle|build\.gradle\.kts|pom\.xml/, "Build/dependency change detected."],
     [/\.github\/workflows/, "GitHub Actions change detected; review permissions, cache, and triggers."],
+    [/docs\/adr\//, "ADR change detected; review whether the architectural decision remains consistent with scope and guardrails."],
+    [/docs\/PROJECT_SCOPE\.md/, "Project scope documentation changed; review whether generated code and claims stay within documented scope."],
+    [/docs\/ARCHITECTURE_GUARDRAILS\.md/, "Architecture guardrails changed; review boundary rules carefully."],
+    [/plugin\.yml/, "plugin.yml changed; review plugin metadata and platform declarations."],
+    [/folia-supported:\s*true/i, "Folia support declaration risk detected; verify that documentation explicitly supports the claim."],
+    [/^\+import\s+(org\.bukkit|io\.papermc)/m, "Platform import added; verify it does not enter forbidden layers."],
     [/src\/main\//, "Production code changed."],
     [/src\/test\//, "Tests changed."],
     [/secrets?|env|token|permission/i, "Sensitive configuration change detected."],
@@ -115,13 +155,91 @@ Production code changes without a corresponding test diff may increase regressio
 
 ## Guidance
 
-Use build/test as the source of truth and manually review sensitive points.
+Use GitHub Actions build/test/integrationTest as the validation source of truth and manually review documentation-sensitive points.
 
 ## Suggested checklist
 
-* [ ] Local build executed.
-* [ ] Relevant tests updated.
+* [ ] GitHub Actions build/test/integrationTest completed.
+* [ ] Relevant tests or documentation updated.
 * [ ] Configuration reviewed.`;
+}
+
+function localGovernance(payload: GovernancePayload, reason: string): GovernanceVerdict {
+  const report = payload.report || "";
+  const diff = payload.diff || "";
+  const unsupportedClaims = [
+    /local build|run gradle locally|\.\/gradlew|gradlew\.bat/i.test(report) ? "The report suggests local Gradle validation, but validation must be performed by GitHub Actions." : "",
+    /Folia/i.test(report) && !/Folia/i.test(diff + contextText(payload)) ? "The report mentions Folia without clear support in the diff or documentation context." : "",
+  ].filter(Boolean);
+  const documentationConflicts = documentationConflictHints(diff);
+  const publishDecision = unsupportedClaims.length ? "publish_with_caution" : "publish";
+  const recommendedIssueBody = `## AI Governance Review
+
+### Verdict
+Local governance fallback reviewed the AI report. Safe reason for provider fallback: ${reason}.
+
+### Relevance
+The report is considered relevant when it references the provided diff, GitHub Actions result/logs, or project documentation context.
+
+### Truthfulness Check
+${unsupportedClaims.length ? "Some claims need caution because they are not directly supported." : "No unsupported claim was detected by local heuristics."}
+
+### Documentation Alignment
+${documentationConflicts.length ? documentationConflicts.map((item) => `* ${item}`).join("\n") : "No direct documentation conflict was detected by local heuristics."}
+
+### Unsupported Claims
+${unsupportedClaims.length ? unsupportedClaims.map((item) => `* ${item}`).join("\n") : "* None detected by local heuristics."}
+
+### Documentation Conflicts
+${documentationConflicts.length ? documentationConflicts.map((item) => `* ${item}`).join("\n") : "* None detected by local heuristics."}
+
+### Publish Decision
+${publishDecision}`;
+  return {
+    publishDecision,
+    confidence: "low",
+    verdict: unsupportedClaims.length ? "The report is partially relevant, but at least one claim needs caution." : "The report appears relevant under local governance heuristics.",
+    unsupportedClaims,
+    documentationConflicts,
+    recommendedIssueBody,
+  };
+}
+
+function documentationConflictHints(diff: string): string[] {
+  const hints: string[] = [];
+  if (/^\+\+\+ b\/docs\/adr\//m.test(diff)) hints.push("ADR documentation changed; ensure implementation and review claims follow the new decision.");
+  if (/^\+\+\+ b\/src\/main\/java\/com\/customcontentengine\/domain\//m.test(diff) && /^\+import\s+(org\.bukkit|io\.papermc)/m.test(diff)) {
+    hints.push("Domain code appears to add a platform import, which may violate documented architecture boundaries.");
+  }
+  if (/plugin\.yml/m.test(diff) && /folia-supported:\s*true/i.test(diff)) {
+    hints.push("plugin.yml appears to declare Folia support; verify this is documented and actually supported.");
+  }
+  if (/\.github\/workflows\//m.test(diff) && /pull_request_target/i.test(diff)) {
+    hints.push("Workflow changes mention pull_request_target; verify this does not weaken fork safety.");
+  }
+  return hints;
+}
+
+function contextText(payload: GovernancePayload): string {
+  return (payload.projectContext || []).map((file) => `${file.path}\n${file.content}`).join("\n");
+}
+
+function inferPublishDecision(markdown: string): GovernanceVerdict["publishDecision"] {
+  const lowered = markdown.toLowerCase();
+  if (lowered.includes("suppress")) return "suppress";
+  if (lowered.includes("publish_with_caution")) return "publish_with_caution";
+  if (lowered.includes("fallback")) return "fallback";
+  return "publish";
+}
+
+function firstParagraph(markdown: string): string {
+  return markdown.split(/\n\s*\n/).map((part) => part.replace(/^#+\s*/gm, "").trim()).find(Boolean)?.slice(0, 500) || "Governance review completed.";
+}
+
+function extractBullets(markdown: string, heading: string): string[] {
+  const idx = markdown.toLowerCase().indexOf(heading.toLowerCase());
+  if (idx < 0) return [];
+  return markdown.slice(idx).split("\n").filter((line) => /^\s*[-*]\s+/.test(line)).slice(0, 10).map((line) => line.replace(/^\s*[-*]\s+/, "").trim());
 }
 
 function extractEvidence(text: string): string {

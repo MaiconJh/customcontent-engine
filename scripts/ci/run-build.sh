@@ -21,14 +21,14 @@ if [[ -x "./gradlew" ]]; then
     # shellcheck disable=SC2086
     run_and_log "Gradle custom command" ${CI_BUILD_COMMAND}
   else
-    run_and_log "Gradle build" ./gradlew clean build --no-daemon
+    run_and_log "Gradle build/test/integrationTest" ./gradlew clean build integrationTest --no-daemon
   fi
   exit $?
 fi
 
 if [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
   if command -v gradle >/dev/null 2>&1; then
-    run_and_log "System Gradle fallback" gradle clean build --no-daemon
+    run_and_log "System Gradle fallback build/test" gradle clean build --no-daemon
     exit $?
   fi
   echo "Gradle project detected, but ./gradlew is unavailable and system gradle is not installed." | tee -a "$LOG_FILE"

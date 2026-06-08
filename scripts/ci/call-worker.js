@@ -23,9 +23,9 @@ AI analysis was not generated because the Worker is not configured or failed.
 
 ### Next steps
 
-* Check the build.log artifact.
+* Check the GitHub Actions build.log artifact.
 * Fix the build/test failure.
-* Re-run the workflow.`;
+* Re-run the GitHub Actions workflow.`;
   }
   return `## AI Technical Note - analysis unavailable
 
@@ -45,8 +45,18 @@ async function main() {
   const type = arg("--type", "diff");
   const inputFile = arg("--input-file", null);
   const outputFile = arg("--output-file", "ai-response.json");
+  const contextFile = arg("--context-file", null);
+  const ciLogsFile = arg("--ci-logs-file", null);
   const contentField = type === "failure" ? "log" : "diff";
   const content = inputFile && fs.existsSync(inputFile) ? fs.readFileSync(inputFile, "utf8") : "";
+  const projectContext = contextFile && fs.existsSync(contextFile)
+    ? JSON.parse(fs.readFileSync(contextFile, "utf8")).files || []
+    : [];
+  const ciLogs = ciLogsFile && fs.existsSync(ciLogsFile)
+    ? fs.readFileSync(ciLogsFile, "utf8")
+    : type === "failure"
+      ? content
+      : `GitHub Actions build-test result: ${process.env.CI_BUILD_RESULT || "success"}. No failure log was produced.`;
   const payload = sanitizeValue({
     type,
     repository: process.env.GITHUB_REPOSITORY || "",
@@ -59,9 +69,12 @@ async function main() {
     run_id: process.env.GITHUB_RUN_ID || "",
     run_url: `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || ""}/actions/runs/${process.env.GITHUB_RUN_ID || ""}`,
     [contentField]: content,
+    ciLogs,
+    projectContext,
     metadata: {
       actor: process.env.GITHUB_ACTOR || "",
       ref: process.env.GITHUB_REF || "",
+      validationSource: "GitHub Actions",
     },
   });
 

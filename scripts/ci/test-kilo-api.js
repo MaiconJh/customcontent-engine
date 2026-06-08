@@ -14,6 +14,7 @@ function loadDotEnv(path = ".env") {
 }
 
 function endpoint() {
+  if (process.env.KILO_ENDPOINT) return process.env.KILO_ENDPOINT;
   const base = (process.env.KILO_BASE_URL || "https://api.kilo.ai/api/gateway").replace(/\/$/, "");
   const path = process.env.KILO_CHAT_COMPLETIONS_PATH || "/chat/completions";
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
