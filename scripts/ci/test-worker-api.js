@@ -22,9 +22,10 @@ function workerUrl() {
 }
 
 async function requestJson(url, options = {}) {
+  const started = Date.now();
   const res = await fetch(url, options);
   const body = await res.json().catch(() => null);
-  return { status: res.status, ok: res.ok, body };
+  return { status: res.status, ok: res.ok, body, durationMs: Date.now() - started };
 }
 
 function headers() {
@@ -86,10 +87,13 @@ function payload(type) {
 
 function summarize(name, result) {
   const body = result.body || {};
+  const hasFinalReport = Boolean(body.finalReport);
+  const hasGovernanceReview = Boolean(body.governanceReview);
+  const fallbackUsed = Boolean(body.fallbackUsed || body.fallback);
   const suffix = body.ok
-    ? `ok=true fallback=${Boolean(body.fallback)} governance=${Boolean(body.governanceReview)} decision=${body.governanceReview?.publishDecision || "n/a"} summary="${String(body.summary || "").slice(0, 120)}"`
+    ? `ok=true finalReport=${hasFinalReport} fallback=${fallbackUsed} fallbackReason="${String(body.fallbackReason || "").slice(0, 120)}" governance=${hasGovernanceReview} decision=${body.governanceReview?.publishDecision || "n/a"} summary="${String(body.summary || "").slice(0, 120)}"`
     : `ok=false error=${body.error?.code || "UNKNOWN"} message="${body.error?.message || "No JSON body"}"`;
-  console.log(`${name}: HTTP ${result.status} ${suffix}`);
+  console.log(`${name}: HTTP ${result.status} durationMs=${result.durationMs} ${suffix}`);
 }
 
 async function main() {

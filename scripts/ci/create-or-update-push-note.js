@@ -52,6 +52,9 @@ function responseMetadata(responsePath) {
     const response = JSON.parse(fs.readFileSync(responsePath, "utf8"));
     const governance = response.governanceReview || {};
     return {
+      hasFinalReport: Boolean(response.finalReport),
+      hasInitialReport: Boolean(response.initialReport),
+      hasGovernanceReview: Boolean(response.governanceReview),
       publishDecision: governance.publishDecision || response.publishDecision || "unknown",
       fallbackUsed: Boolean(response.fallbackUsed),
       fallbackReason: response.fallbackReason || "",
@@ -105,6 +108,9 @@ async function main() {
   console.log(`Push note diagnostics: reportPath=${bodyPath || "stdin"}`);
   console.log(`Push note diagnostics: reportExists=${reportExists}`);
   console.log(`Push note diagnostics: reportLength=${reportBody.length}`);
+  console.log(`Push note diagnostics: hasFinalReport=${metadata.hasFinalReport ?? "unknown"}`);
+  console.log(`Push note diagnostics: hasInitialReport=${metadata.hasInitialReport ?? "unknown"}`);
+  console.log(`Push note diagnostics: hasGovernanceReview=${metadata.hasGovernanceReview ?? "unknown"}`);
   console.log(`Push note diagnostics: publishDecision=${metadata.publishDecision || "unknown"}`);
   console.log(`Push note diagnostics: fallbackUsed=${metadata.fallbackUsed ?? "unknown"}`);
   if (metadata.fallbackReason) console.log(`Push note diagnostics: fallbackReason=${metadata.fallbackReason}`);
