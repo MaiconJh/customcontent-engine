@@ -64,6 +64,30 @@ It does not replace the source-of-truth documents:
 
 If `AI_CONTEXT_PACK.md` conflicts with project scope, architecture guardrails, ADRs, or milestones, the original source documents win. Governance review must treat the context pack as useful context, not as an authority stronger than ADRs or the primary scope documents.
 
+### AI Context Pack Drift Detection
+
+`scripts/ci/check-ai-context-pack-drift.js` emits an advisory JSON signal when source-of-truth documentation changes.
+
+Observed source documents:
+
+- `docs/PROJECT_SCOPE.md`
+- `docs/ARCHITECTURE_GUARDRAILS.md`
+- `docs/adr/*.md`
+- `docs/milestones/*.md`
+
+If any of those files change without a matching `docs/AI_CONTEXT_PACK.md` update, the script emits:
+
+```json
+{
+  "ok": true,
+  "driftRisk": true,
+  "message": "Source-of-truth documentation changed without AI_CONTEXT_PACK.md update.",
+  "changedSourceDocs": ["docs/PROJECT_SCOPE.md"]
+}
+```
+
+This is advisory only and must not be treated as a hard gate. Source documents still win over `AI_CONTEXT_PACK.md`. Governance review receives the `aiContextPackDrift` signal and should mention possible context drift when relevant.
+
 ## Initial AI Report
 
 The Worker asks Kilo Code to review the change using:

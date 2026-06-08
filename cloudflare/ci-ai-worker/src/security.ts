@@ -42,6 +42,9 @@ export function validatePayload(value: unknown, expectedType: "failure" | "diff"
   if (payload.projectContext !== undefined && !isValidProjectContext(payload.projectContext)) {
     throw new SecurityError("BAD_REQUEST", "projectContext must be an array of path/content objects.", 400);
   }
+  if (payload.aiContextPackDrift !== undefined && !isValidDriftSignal(payload.aiContextPackDrift)) {
+    throw new SecurityError("BAD_REQUEST", "aiContextPackDrift must be a drift signal object.", 400);
+  }
   return payload as unknown as AnalyzePayload;
 }
 
@@ -60,6 +63,9 @@ export function validateGovernancePayload(value: unknown, env: Env): GovernanceP
   if (payload.projectContext !== undefined && !isValidProjectContext(payload.projectContext)) {
     throw new SecurityError("BAD_REQUEST", "projectContext must be an array of path/content objects.", 400);
   }
+  if (payload.aiContextPackDrift !== undefined && !isValidDriftSignal(payload.aiContextPackDrift)) {
+    throw new SecurityError("BAD_REQUEST", "aiContextPackDrift must be a drift signal object.", 400);
+  }
   return payload as unknown as GovernancePayload;
 }
 
@@ -70,6 +76,16 @@ function isValidProjectContext(value: unknown): value is ProjectContextFile[] {
       && typeof item === "object"
       && typeof (item as ProjectContextFile).path === "string"
       && typeof (item as ProjectContextFile).content === "string");
+}
+
+function isValidDriftSignal(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const signal = value as Record<string, unknown>;
+  return typeof signal.ok === "boolean"
+    && typeof signal.driftRisk === "boolean"
+    && typeof signal.message === "string"
+    && Array.isArray(signal.changedSourceDocs)
+    && signal.changedSourceDocs.every((file) => typeof file === "string");
 }
 
 export function isRepositoryAllowed(repository: string, env: Env): boolean {

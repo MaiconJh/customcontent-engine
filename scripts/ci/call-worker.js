@@ -47,6 +47,7 @@ async function main() {
   const outputFile = arg("--output-file", "ai-response.json");
   const contextFile = arg("--context-file", null);
   const ciLogsFile = arg("--ci-logs-file", null);
+  const driftFile = arg("--drift-file", null);
   const contentField = type === "failure" ? "log" : "diff";
   const content = inputFile && fs.existsSync(inputFile) ? fs.readFileSync(inputFile, "utf8") : "";
   const projectContext = contextFile && fs.existsSync(contextFile)
@@ -57,6 +58,9 @@ async function main() {
     : type === "failure"
       ? content
       : `GitHub Actions build-test result: ${process.env.CI_BUILD_RESULT || "success"}. No failure log was produced.`;
+  const aiContextPackDrift = driftFile && fs.existsSync(driftFile)
+    ? JSON.parse(fs.readFileSync(driftFile, "utf8"))
+    : undefined;
   const payload = sanitizeValue({
     type,
     repository: process.env.GITHUB_REPOSITORY || "",
@@ -71,6 +75,7 @@ async function main() {
     [contentField]: content,
     ciLogs,
     projectContext,
+    aiContextPackDrift,
     metadata: {
       actor: process.env.GITHUB_ACTOR || "",
       ref: process.env.GITHUB_REF || "",

@@ -32,9 +32,16 @@ describe("prompt-builder", () => {
       ciLogs: "GitHub Actions build-test result: success.",
       initialReport: "Initial AI report.",
       projectContext: [{ path: "docs/PROJECT_SCOPE.md", content: "Scope document.", truncated: false }],
+      aiContextPackDrift: {
+        ok: true,
+        driftRisk: true,
+        message: "Source-of-truth documentation changed without AI_CONTEXT_PACK.md update.",
+        changedSourceDocs: ["docs/PROJECT_SCOPE.md"],
+      },
     }, { MAX_MODEL_INPUT_CHARS: "2000" });
     expect(prompt.system).toContain("governance reviewer");
     expect(prompt.user).toContain("Initial AI report");
     expect(prompt.user).toContain("docs/PROJECT_SCOPE.md");
+    expect(prompt.user).toContain("AI context pack drift signal");
   });
 });

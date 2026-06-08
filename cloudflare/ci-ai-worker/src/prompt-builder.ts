@@ -28,6 +28,7 @@ Workflow: ${payload.workflow}
 Run URL: ${payload.run_url}`;
   const context = formatProjectContext(payload.projectContext || []);
   const ciLogs = sanitizeText(payload.ciLogs || "", Math.min(12000, limit));
+  const drift = formatDriftSignal(payload.aiContextPackDrift);
 
   if (payload.type === "failure") {
     return {
@@ -53,7 +54,10 @@ Sanitized log:
 ${payload.log}
 
 Repository documentation context:
-${context}`, limit),
+${context}
+
+AI context pack drift signal:
+${drift}`, limit),
     };
   }
 
@@ -103,7 +107,10 @@ GitHub Actions result/logs:
 ${ciLogs}
 
 Repository documentation context:
-${context}`, limit),
+${context}
+
+AI context pack drift signal:
+${drift}`, limit),
   };
 }
 
@@ -133,6 +140,9 @@ ${payload.ciLogs || payload.log || ""}
 
 Project documentation context:
 ${formatProjectContext(payload.projectContext || [])}
+
+AI context pack drift signal:
+${formatDriftSignal(payload.aiContextPackDrift)}
 
 Initial AI report:
 ${payload.initialReport}
@@ -167,4 +177,13 @@ function formatProjectContext(files: ProjectContextFile[]): string {
     .slice(0, 80)
     .map((file) => `--- ${file.path}${file.truncated ? " [TRUNCATED]" : ""} ---\n${file.content}`)
     .join("\n\n");
+}
+
+function formatDriftSignal(signal: AnalyzePayload["aiContextPackDrift"]): string {
+  if (!signal) return "No AI context pack drift signal was provided.";
+  return JSON.stringify({
+    driftRisk: signal.driftRisk,
+    message: signal.message,
+    changedSourceDocs: signal.changedSourceDocs,
+  }, null, 2);
 }

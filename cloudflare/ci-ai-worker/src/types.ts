@@ -30,6 +30,7 @@ export interface BasePayload {
   run_url: string;
   ciLogs?: string;
   projectContext?: ProjectContextFile[];
+  aiContextPackDrift?: AiContextPackDrift;
   metadata?: Record<string, unknown>;
 }
 
@@ -37,6 +38,13 @@ export interface ProjectContextFile {
   path: string;
   content: string;
   truncated?: boolean;
+}
+
+export interface AiContextPackDrift {
+  ok: boolean;
+  driftRisk: boolean;
+  message: string;
+  changedSourceDocs: string[];
 }
 
 export interface FailurePayload extends BasePayload {
