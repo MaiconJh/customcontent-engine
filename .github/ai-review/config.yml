@@ -1,0 +1,37 @@
+enabled: true
+
+repository:
+  allowed_branches:
+    - main
+  max_diff_chars: 50000
+  max_log_chars: 50000
+
+comments:
+  update_existing: true
+  create_inline_comments: true
+  max_inline_comments: 10
+  min_severity_for_inline: warning
+
+issues:
+  create_on_failure: true
+  reuse_label: ci-failure
+  labels:
+    - ci-failure
+    - automated
+    - ai-analysis
+
+worker:
+  endpoint_env: CI_AI_WORKER_URL
+  require_shared_secret: false
+  timeout_seconds: 45
+
+security:
+  redact_secrets: true
+  block_env_files: true
+  max_payload_bytes: 120000
+
+build:
+  java_version: auto
+  tool: auto
+  gradle_command: ./gradlew clean build --no-daemon
+  maven_command: mvn -B clean verify

@@ -1,0 +1,23 @@
+{
+  "name": "ci-ai-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-08",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "ALLOWED_REPOSITORIES": "MaiconJh/customcontent-engine,MaiconJh/Schema-Validator",
+    "MAX_BODY_BYTES": "120000",
+    "MAX_MODEL_INPUT_CHARS": "50000",
+    "RATE_LIMIT_WINDOW_SECONDS": "60",
+    "RATE_LIMIT_MAX_REQUESTS": "20",
+    "REQUIRE_SHARED_SECRET": "false",
+    "CI_WORKER_SHARED_SECRET": "",
+    "KILO_BASE_URL": "https://api.kilo.ai/api/gateway",
+    "KILO_CHAT_COMPLETIONS_PATH": "/chat/completions",
+    "KILO_MODEL": "kilo/auto-free",
+    "KILO_FALLBACK_MODEL": "minimax/minimax-m2.5:free",
+    "KILO_SECOND_FALLBACK_MODEL": "z-ai/glm-5:free",
+    "KILO_API_KEY": ""
+  }
+}
