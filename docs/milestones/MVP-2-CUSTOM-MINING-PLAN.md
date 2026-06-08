@@ -1,8 +1,10 @@
 # MVP-2 Custom Mining Plan
 
-Status: Planned  
+Status: Complete  
 Date: 2026-06-07  
 Scope: complete custom mining model for custom blocks and tools
+
+Completion record: `docs/milestones/MVP-2-COMPLETE.md`
 
 ## 1. Objective
 
@@ -10,7 +12,7 @@ MVP-2 introduces Strategy B: complete custom mining.
 
 The goal is to make custom blocks and custom tools use engine-controlled mining behavior instead of relying on vanilla break timing.
 
-This plan does not implement code. It defines the future implementation boundary, architecture, runtime flow, performance strategy, Folia/Paper constraints, YAML direction, risks, and acceptance criteria.
+This plan originally defined the implementation boundary, architecture, runtime flow, performance strategy, Folia/Paper constraints, YAML direction, risks, and acceptance criteria. MVP-2 has since been completed; see `docs/milestones/MVP-2-COMPLETE.md`.
 
 ## 2. Current State
 
