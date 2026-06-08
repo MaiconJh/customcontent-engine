@@ -21,17 +21,39 @@ function endpoint() {
 }
 
 function models() {
-  return [
+  const authConfigured = Boolean(validApiKey(process.env.KILO_API_KEY));
+  const primary = modelName(process.env.KILO_MODEL) || "kilo-auto/free";
+  const configured = [
     process.env.KILO_MODEL || "kilo-auto/free",
     process.env.KILO_FALLBACK_MODEL || "kilo-auto/balanced",
     process.env.KILO_SECOND_FALLBACK_MODEL || "kilo/auto-free",
-  ].filter(Boolean);
+  ].map(modelName).filter(Boolean);
+  const normalized = configured.map((model, index) => index === 0 && !authConfigured && knownBadAnonymousModel(primary) ? "kilo-auto/free" : model);
+  return normalized
+    .filter((model, index, all) => all.indexOf(model) === index)
+    .filter((model) => authConfigured || !knownBadAnonymousModel(model));
 }
 
 function headers() {
   const out = { "Content-Type": "application/json" };
-  if (process.env.KILO_API_KEY) out.Authorization = `Bearer ${process.env.KILO_API_KEY}`;
+  const apiKey = validApiKey(process.env.KILO_API_KEY);
+  if (apiKey) out.Authorization = `Bearer ${apiKey}`;
   return out;
+}
+
+function validApiKey(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (/^(undefined|null|\[redacted\])$/i.test(trimmed)) return "";
+  return trimmed;
+}
+
+function modelName(value) {
+  return String(value || "").trim();
+}
+
+function knownBadAnonymousModel(model) {
+  return model.trim().toLowerCase() !== "kilo-auto/free";
 }
 
 async function testModel(url, model) {
@@ -99,8 +121,9 @@ function safeError(body, rawText) {
 async function main() {
   loadDotEnv();
   const url = endpoint();
+  const authConfigured = Boolean(validApiKey(process.env.KILO_API_KEY));
   console.log(`endpoint: ${url}`);
-  console.log(`auth: ${process.env.KILO_API_KEY ? "KILO_API_KEY present" : "anonymous/no KILO_API_KEY"}`);
+  console.log(`authConfigured: ${authConfigured}`);
 
   for (const model of models()) {
     const result = await testModel(url, model);

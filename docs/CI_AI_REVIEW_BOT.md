@@ -278,7 +278,9 @@ KILO_SECOND_FALLBACK_MODEL=kilo/auto-free
 KILO_TIMEOUT_MS=30000
 ```
 
-`KILO_API_KEY` is optional. If it is not configured, the Worker does not send an `Authorization` header.
+`KILO_API_KEY` is optional. If there is no valid key, do not configure `KILO_API_KEY`; leave it absent or empty. The Worker treats empty values, `undefined`, and `null` as not configured and does not send an `Authorization` header.
+
+Anonymous/free usage only attempts `kilo-auto/free`. Authenticated fallback models are used only when a valid `KILO_API_KEY` is configured. If `provider status 401` appears, check that `KILO_MODEL` is `kilo-auto/free` for anonymous/free usage and verify that no invalid `Authorization` header is being sent.
 
 The parser accepts:
 
