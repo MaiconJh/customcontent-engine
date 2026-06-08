@@ -189,6 +189,33 @@ For CI failures, the bot creates or reuses a `ci-failure` issue and includes Git
 
 The bot must never mask a real build/test/integrationTest failure. AI/provider failures are non-blocking; GitHub Actions validation remains authoritative.
 
+## Issue-Driven Planning
+
+`.github/workflows/ai-issue-plan.yml` creates or updates an advisory planning comment when a GitHub issue has the `ai:plan` label.
+
+The workflow runs for:
+
+- `issues` events when `ai:plan` is added or already present on opened, edited, or reopened issues;
+- manual `workflow_dispatch` runs with an issue number.
+
+`scripts/ci/create-or-update-issue-plan.js` collects project documentation context, calls the Worker endpoint `POST /v1/plan/issue`, and posts one deduplicated issue comment with the marker `<!-- customcontent-engine:ai-plan -->`.
+
+The planning comment is advisory only. It must not edit source files, commit changes, open pull requests automatically, merge code, or change source-of-truth documentation without maintainer review.
+
+The plan checks alignment with:
+
+- `docs/AI_CONTEXT_PACK.md`
+- `docs/PROJECT_SCOPE.md`
+- `docs/ARCHITECTURE_GUARDRAILS.md`
+- `docs/adr/*.md`
+- `docs/milestones/*.md`
+
+`AI_CONTEXT_PACK.md` remains derived guidance. If it conflicts with project scope, architecture guardrails, ADRs, or milestones, the original source documents win.
+
+The planning endpoint warns strongly when an issue asks for guarded or out-of-scope areas such as economy systems, quest systems, generic combat systems, GUI/menu frameworks, scripting languages, generic ability frameworks, land protection, NMS/reflection, direct Bukkit/Paper usage in domain/application layers, `folia-supported: true` without validation, or accepted ADR changes without a new ADR.
+
+If the Worker or Kilo is unavailable, the script publishes a conservative local fallback plan with the precise fallback reason. Validation guidance must remain remote-only: GitHub Actions build/test/integrationTest and CI AI Governance Bot.
+
 ## Fallback Behavior
 
 If Kilo does not return a usable response, the Worker uses local fallback. The fallback is in English and considers basic documentation-sensitive signals, including:

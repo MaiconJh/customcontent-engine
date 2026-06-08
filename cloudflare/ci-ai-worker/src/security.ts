@@ -69,6 +69,26 @@ export function validateGovernancePayload(value: unknown, env: Env): GovernanceP
   return payload as unknown as GovernancePayload;
 }
 
+export function validateIssuePlanPayload(value: unknown, env: Env): Record<string, unknown> {
+  if (!value || typeof value !== "object") throw new SecurityError("BAD_REQUEST", "Payload must be an object.", 400);
+  const payload = value as Record<string, unknown>;
+  if (!isRepositoryAllowed(String(payload.repository || ""), env)) throw new SecurityError("FORBIDDEN", "Repository is not allowed.", 403);
+  for (const key of ["repository", "issueTitle", "issueBody"]) {
+    if (typeof payload[key] !== "string") throw new SecurityError("BAD_REQUEST", `${key} is required.`, 400);
+  }
+  if (typeof payload.issueNumber !== "number") throw new SecurityError("BAD_REQUEST", "issueNumber is required.", 400);
+  if (!Array.isArray(payload.issueLabels) || !payload.issueLabels.every((label) => typeof label === "string")) {
+    throw new SecurityError("BAD_REQUEST", "issueLabels must be a string array.", 400);
+  }
+  if (payload.projectContext !== undefined && !isValidProjectContext(payload.projectContext)) {
+    throw new SecurityError("BAD_REQUEST", "projectContext must be an array of path/content objects.", 400);
+  }
+  if (payload.aiContextPackDrift !== undefined && !isValidDriftSignal(payload.aiContextPackDrift)) {
+    throw new SecurityError("BAD_REQUEST", "aiContextPackDrift must be a drift signal object.", 400);
+  }
+  return payload;
+}
+
 function isValidProjectContext(value: unknown): value is ProjectContextFile[] {
   return Array.isArray(value)
     && value.length <= 80

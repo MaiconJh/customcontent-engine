@@ -1,0 +1,50 @@
+name: AI Issue Planning
+
+on:
+  issues:
+    types: [labeled, opened, edited, reopened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to plan.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  plan:
+    name: Create or update AI implementation plan
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'issues' &&
+        (
+          (github.event.action == 'labeled' && github.event.label.name == 'ai:plan') ||
+          (
+            (github.event.action == 'opened' || github.event.action == 'edited' || github.event.action == 'reopened') &&
+            contains(github.event.issue.labels.*.name, 'ai:plan')
+          )
+        )
+      )
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create or update AI implementation plan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF: ${{ github.ref }}
+          CI_AI_WORKER_URL: ${{ vars.CI_AI_WORKER_URL }}
+          CI_WORKER_SHARED_SECRET: ${{ secrets.CI_WORKER_SHARED_SECRET }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+        run: node scripts/ci/create-or-update-issue-plan.js

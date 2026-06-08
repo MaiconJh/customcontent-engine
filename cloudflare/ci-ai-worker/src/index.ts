@@ -3,8 +3,9 @@ import { buildGovernancePrompt, buildPrompt } from "./prompt-builder";
 import { checkRateLimit } from "./rate-limit";
 import { callKiloChatCompletion } from "./providers/kilo";
 import { formatGithubMarkdown, normalizeFindings } from "./formatters/github";
+import { planIssue, type IssuePlanPayload } from "./issue-planning";
 import { errorResponse, okResponse } from "./response-schema";
-import { readJsonBody, SecurityError, validateGovernancePayload, validatePayload, validateSharedSecret } from "./security";
+import { readJsonBody, SecurityError, validateGovernancePayload, validateIssuePlanPayload, validatePayload, validateSharedSecret } from "./security";
 import { sanitizeObject } from "./sanitizer";
 
 export default {
@@ -16,10 +17,18 @@ export default {
         return Response.json({ ok: true, service: "ci-ai-worker" });
       }
       if (request.method !== "POST") return errorResponse("BAD_REQUEST", "Unsupported method.", 405);
-      if (!["/v1/analyze/failure", "/v1/analyze/diff", "/v1/analyze/governance"].includes(url.pathname)) {
+      if (!["/v1/analyze/failure", "/v1/analyze/diff", "/v1/analyze/governance", "/v1/plan/issue"].includes(url.pathname)) {
         return errorResponse("BAD_REQUEST", "Unsupported route.", 404);
       }
       await validateSharedSecret(request, env);
+      if (url.pathname === "/v1/plan/issue") {
+        const rawPlan = await readJsonBody(request, env);
+        const planPayload = sanitizeObject(validateIssuePlanPayload(rawPlan, env), Number(env.MAX_MODEL_INPUT_CHARS || "50000")) as unknown as IssuePlanPayload;
+        if (!checkRateLimit(request, env, url.pathname, planPayload.repository, "issues")) {
+          return errorResponse("RATE_LIMITED", "Rate limit exceeded.", 429);
+        }
+        return Response.json(await planIssue(planPayload, env));
+      }
       if (url.pathname.endsWith("/governance")) {
         const rawGovernance = await readJsonBody(request, env);
         const governancePayload = sanitizeObject(validateGovernancePayload(rawGovernance, env), Number(env.MAX_MODEL_INPUT_CHARS || "50000"));
