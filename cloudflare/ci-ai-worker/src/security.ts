@@ -1,7 +1,7 @@
-import type { AnalyzePayload, Env, ProjectContextFile } from "./types";
+import type { AnalyzePayload, Env, GovernancePayload, ProjectContextFile } from "./types";
 
 const EVENTS = new Set(["push", "pull_request", "workflow_dispatch"]);
-const TYPES = new Set(["failure", "diff"]);
+const TYPES = new Set(["failure", "diff", "governance"]);
 
 export function maxBodyBytes(env: Env): number {
   return Number(env.MAX_BODY_BYTES || "120000");
@@ -43,6 +43,24 @@ export function validatePayload(value: unknown, expectedType: "failure" | "diff"
     throw new SecurityError("BAD_REQUEST", "projectContext must be an array of path/content objects.", 400);
   }
   return payload as unknown as AnalyzePayload;
+}
+
+export function validateGovernancePayload(value: unknown, env: Env): GovernancePayload {
+  if (!value || typeof value !== "object") throw new SecurityError("BAD_REQUEST", "Payload must be an object.", 400);
+  const payload = value as Record<string, unknown>;
+  if (payload.type !== "governance") throw new SecurityError("BAD_REQUEST", "Invalid analysis type.", 400);
+  if (!EVENTS.has(String(payload.event))) throw new SecurityError("BAD_REQUEST", "Invalid event.", 400);
+  if (!isRepositoryAllowed(String(payload.repository || ""), env)) throw new SecurityError("FORBIDDEN", "Repository is not allowed.", 403);
+  for (const key of ["repository", "branch", "commit", "workflow", "run_id", "run_url", "initialReport"]) {
+    if (typeof payload[key] !== "string") throw new SecurityError("BAD_REQUEST", `${key} is required.`, 400);
+  }
+  if (payload.ciLogs !== undefined && typeof payload.ciLogs !== "string") throw new SecurityError("BAD_REQUEST", "ciLogs must be a string.", 400);
+  if (payload.diff !== undefined && typeof payload.diff !== "string") throw new SecurityError("BAD_REQUEST", "diff must be a string.", 400);
+  if (payload.log !== undefined && typeof payload.log !== "string") throw new SecurityError("BAD_REQUEST", "log must be a string.", 400);
+  if (payload.projectContext !== undefined && !isValidProjectContext(payload.projectContext)) {
+    throw new SecurityError("BAD_REQUEST", "projectContext must be an array of path/content objects.", 400);
+  }
+  return payload as unknown as GovernancePayload;
 }
 
 function isValidProjectContext(value: unknown): value is ProjectContextFile[] {

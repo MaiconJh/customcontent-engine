@@ -15,7 +15,7 @@ export interface Env {
   KILO_API_KEY?: string;
 }
 
-export type AnalysisType = "failure" | "diff";
+export type AnalysisType = "failure" | "diff" | "governance";
 export type EventType = "push" | "pull_request" | "workflow_dispatch";
 export type Severity = "info" | "warning" | "error";
 
@@ -53,6 +53,27 @@ export interface DiffPayload extends BasePayload {
 
 export type AnalyzePayload = FailurePayload | DiffPayload;
 
+export interface GovernancePayload extends BasePayload {
+  type: "governance";
+  diff?: string;
+  log?: string;
+  initialReport: string;
+}
+
+export type PublishDecision = "publish" | "publish_with_caution" | "amend" | "suppress" | "fallback";
+
+export interface GovernanceReview {
+  publishDecision: PublishDecision;
+  confidence: "high" | "medium" | "low";
+  verdict: string;
+  relevance: string;
+  truthfulness: string;
+  documentationAlignment: string;
+  unsupportedClaims: string[];
+  documentationConflicts: string[];
+  recommendedIssueBody: string;
+}
+
 export interface Finding {
   severity: Severity;
   file?: string;
@@ -68,7 +89,12 @@ export interface AnalyzeResponse {
   summary: string;
   markdown: string;
   findings: Finding[];
+  initialReport?: string;
+  governanceReview?: GovernanceReview;
+  finalReport?: string;
   fallback?: boolean;
+  fallbackUsed?: boolean;
+  fallbackReason?: string;
 }
 
 export interface ErrorResponse {

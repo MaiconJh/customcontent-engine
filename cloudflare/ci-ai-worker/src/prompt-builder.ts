@@ -1,4 +1,4 @@
-import type { AnalyzePayload, Env, ProjectContextFile } from "./types";
+import type { AnalyzePayload, Env, GovernancePayload, ProjectContextFile } from "./types";
 import { maxModelInputChars } from "./security";
 import { sanitizeText } from "./sanitizer";
 
@@ -104,6 +104,60 @@ ${ciLogs}
 
 Repository documentation context:
 ${context}`, limit),
+  };
+}
+
+export function buildGovernancePrompt(payload: GovernancePayload, env: Env): { system: string; user: string } {
+  const limit = maxModelInputChars(env);
+  return {
+    system: `You are a governance reviewer.
+Your task is to audit the previous AI report, not to invent new findings.
+Check whether each claim is supported by the diff, CI logs, or repository documentation.
+If the report is irrelevant, exaggerated, or unsupported, say so.
+If the report missed a clear architecture/scope violation, say so.
+Do not publish unsupported claims.
+Prefer conservative wording.
+Return clear English Markdown plus a concise machine-readable decision line.`,
+    user: sanitizeText(`Repository: ${payload.repository}
+Event: ${payload.event}
+Branch: ${payload.branch}
+Commit: ${payload.commit}
+Workflow: ${payload.workflow}
+Run URL: ${payload.run_url}
+
+Git diff:
+${payload.diff || ""}
+
+CI result/logs:
+${payload.ciLogs || payload.log || ""}
+
+Project documentation context:
+${formatProjectContext(payload.projectContext || [])}
+
+Initial AI report:
+${payload.initialReport}
+
+Audit questions:
+- Is the initial report relevant?
+- Is the report factually supported by diff, CI logs, or projectContext?
+- Are there unsupported claims?
+- Are there documentation conflicts?
+- Did the report miss an important scope or architecture violation?
+- Should the report be published as-is, published with caution, amended, suppressed, or replaced by fallback?
+
+Return Markdown with exactly these headings:
+
+## AI Governance Review
+### Verdict
+### Relevance
+### Truthfulness Check
+### Documentation Alignment
+### Publish Decision
+### Unsupported Claims
+### Documentation Conflicts
+### Recommended Issue Body
+
+Allowed publish decisions: publish, publish_with_caution, amend, suppress, fallback.`, limit),
   };
 }
 

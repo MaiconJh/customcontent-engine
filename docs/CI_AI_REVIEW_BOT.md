@@ -15,7 +15,8 @@ GitHub Actions
 -> sanitize payload
 -> Cloudflare Worker
 -> Kilo Gateway initial report
--> Markdown response
+-> governance/interceptor review
+-> final Markdown response
 -> GitHub issue/comment
 ```
 
@@ -70,9 +71,47 @@ The prompt asks the model to check:
 
 The model is instructed not to claim a problem unless it is supported by the diff, CI logs, or documentation context.
 
-## Future Governance Review
+## Governance Review
 
-Governance/interceptor review is planned as a later Continuous AI Evolution phase. It is not part of this step.
+After the initial AI report is generated, the Worker runs a governance/interceptor review. The governance reviewer audits the previous report instead of inventing a second independent report.
+
+The governance review checks:
+
+- whether the initial report is relevant;
+- whether claims are supported by the diff, CI logs, or project documentation context;
+- whether there are unsupported claims;
+- whether there are documentation conflicts;
+- whether the report missed a clear scope or architecture violation;
+- whether the report should be published as-is, published with caution, amended, suppressed, or replaced by fallback.
+
+The Worker response includes:
+
+- `initialReport`
+- `governanceReview`
+- `finalReport`
+- `fallbackUsed`
+- `fallbackReason`, when available
+
+Supported publish decisions:
+
+- `publish`: use the initial report.
+- `publish_with_caution`: use the report, but surface governance warnings.
+- `amend`: use `recommendedIssueBody` when provided.
+- `suppress`: publish only a short suppression note.
+- `fallback`: use fallback output because provider review failed or inputs were insufficient.
+
+The GitHub Markdown includes:
+
+```text
+## AI Governance Review
+### Verdict
+### Relevance
+### Truthfulness Check
+### Documentation Alignment
+### Publish Decision
+### Unsupported Claims
+### Documentation Conflicts
+```
 
 ## GitHub Behavior
 
@@ -80,7 +119,7 @@ For pull requests, the bot creates or updates one deduplicated PR comment using 
 
 For pushes to `main`, the bot creates or updates one deduplicated technical note issue. The body includes hidden commit/run markers so the note remains traceable without creating spam.
 
-For CI failures, the bot creates or reuses a `ci-failure` issue and includes GitHub Actions failure evidence.
+For CI failures, the bot creates or reuses a `ci-failure` issue and includes GitHub Actions failure evidence plus the governance review.
 
 The bot must never mask a real build/test/integrationTest failure. AI/provider failures are non-blocking; GitHub Actions validation remains authoritative.
 
@@ -95,6 +134,12 @@ If Kilo does not return a usable response, the Worker uses local fallback. The f
 - `plugin.yml` metadata changes
 - `folia-supported: true` declarations
 - GitHub Actions permission/cache/trigger changes
+
+If Kilo fails during governance review, the Worker uses conservative local governance:
+
+- `publish_with_caution` when there is diff, CI log, or documentation context to review;
+- `suppress` when the initial report is empty;
+- `fallback` when inputs are insufficient for a supported review.
 
 ## Kilo Provider
 
