@@ -1,0 +1,25 @@
+name: AI Context Pack Refresh
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+
+      - name: Propose AI context pack refresh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          CI_AI_WORKER_URL: ${{ vars.CI_AI_WORKER_URL }}
+          CI_WORKER_SHARED_SECRET: ${{ secrets.CI_WORKER_SHARED_SECRET }}
+        run: node scripts/ci/propose-ai-context-pack-refresh.js --pr

@@ -88,6 +88,32 @@ If any of those files change without a matching `docs/AI_CONTEXT_PACK.md` update
 
 This is advisory only and must not be treated as a hard gate. Source documents still win over `AI_CONTEXT_PACK.md`. Governance review receives the `aiContextPackDrift` signal and should mention possible context drift when relevant.
 
+### Controlled AI Context Pack Refresh
+
+`scripts/ci/propose-ai-context-pack-refresh.js` proposes controlled updates to `docs/AI_CONTEXT_PACK.md`.
+
+The script reads:
+
+- `docs/PROJECT_SCOPE.md`
+- `docs/ARCHITECTURE_GUARDRAILS.md`
+- `docs/adr/*.md`
+- `docs/milestones/*.md`
+- `docs/CI_AI_REVIEW_BOT.md`
+- `docs/AI_CONTINUOUS_EVOLUTION_ARCHITECTURE.md`
+- the current `docs/AI_CONTEXT_PACK.md`
+
+It builds a refresh prompt for the Worker/Kilo when `CI_AI_WORKER_URL` is configured. If the Worker refresh endpoint is unavailable, it creates a conservative local proposal derived from the same source documents.
+
+Supported modes:
+
+- `--dry-run`: writes a temporary proposal file and does not create a branch, commit, or pull request.
+- `--write`: updates `docs/AI_CONTEXT_PACK.md` locally but does not commit.
+- `--pr`: creates a branch named `ai/context-pack-refresh-<run-id-or-date>`, updates `docs/AI_CONTEXT_PACK.md`, commits `Refresh AI context pack`, pushes the branch, and opens a pull request.
+
+`.github/workflows/ai-context-pack-refresh.yml` exposes this flow as a manual `workflow_dispatch` workflow only. It does not run on push, does not run Gradle, does not run Java tests, and does not modify `build-test.yml`.
+
+The refresh flow is PR-only and requires human review. It must not auto-merge. `AI_CONTEXT_PACK.md` remains derived guidance; `PROJECT_SCOPE.md`, `ARCHITECTURE_GUARDRAILS.md`, ADRs, and milestones remain authoritative.
+
 ## Initial AI Report
 
 The Worker asks Kilo Code to review the change using:
