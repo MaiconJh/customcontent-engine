@@ -8,6 +8,7 @@ import com.customcontentengine.domain.mining.MiningHardness;
 import com.customcontentengine.domain.mining.MiningSpeed;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
+import com.customcontentengine.port.MiningCompletionPort;
 import com.customcontentengine.port.MiningVisualPort;
 import com.customcontentengine.port.SchedulerPort;
 import java.util.ArrayList;
@@ -25,7 +26,8 @@ class MiningRuntimeProcessorTest {
     void stageUpdateCallsVisualPortWhenStageChanges() {
         MiningSessionService service = service();
         CapturingVisualPort visual = new CapturingVisualPort();
-        MiningRuntimeProcessor processor = processor(service, visual);
+        CapturingCompletionPort completion = new CapturingCompletionPort();
+        MiningRuntimeProcessor processor = processor(service, visual, completion);
         service.startSession(ACTOR_KEY, TARGET, TOOL_ID, HARDNESS, SPEED, 1000L);
 
         int scheduled = processor.processActiveSessions(1500L, 8);
@@ -51,16 +53,34 @@ class MiningRuntimeProcessorTest {
     }
 
     @Test
-    void completionOnlyClearsVisualForNow() {
+    void completionCallsCompletionPortAndClearsVisual() {
         MiningSessionService service = service();
         CapturingVisualPort visual = new CapturingVisualPort();
-        MiningRuntimeProcessor processor = processor(service, visual);
+        CapturingCompletionPort completion = new CapturingCompletionPort();
+        MiningRuntimeProcessor processor = processor(service, visual, completion);
         service.startSession(ACTOR_KEY, TARGET, TOOL_ID, new MiningHardness(2.0D), new MiningSpeed(1.0D), 1000L);
 
         processor.processActiveSessions(3000L, 8);
 
         assertEquals(List.of(ACTOR_KEY), visual.clears);
+        assertEquals(1, completion.requests.size());
+        assertEquals(TARGET, completion.requests.get(0).position());
+        assertEquals(TOOL_ID, completion.requests.get(0).toolId());
         assertFalse(service.getActiveSession(ACTOR_KEY).isPresent());
+    }
+
+    @Test
+    void completionIsNotRepeatedAfterSessionWasRemoved() {
+        MiningSessionService service = service();
+        CapturingVisualPort visual = new CapturingVisualPort();
+        CapturingCompletionPort completion = new CapturingCompletionPort();
+        MiningRuntimeProcessor processor = processor(service, visual, completion);
+        service.startSession(ACTOR_KEY, TARGET, TOOL_ID, new MiningHardness(2.0D), new MiningSpeed(1.0D), 1000L);
+
+        processor.processActiveSessions(3000L, 8);
+        processor.processSession(ACTOR_KEY, TARGET, 3000L);
+
+        assertEquals(1, completion.requests.size());
     }
 
     @Test
@@ -91,7 +111,14 @@ class MiningRuntimeProcessorTest {
     }
 
     private static MiningRuntimeProcessor processor(MiningSessionService service, CapturingVisualPort visual) {
-        return new MiningRuntimeProcessor(service, visual, new ImmediateScheduler());
+        return processor(service, visual, new CapturingCompletionPort());
+    }
+
+    private static MiningRuntimeProcessor processor(
+            MiningSessionService service,
+            CapturingVisualPort visual,
+            MiningCompletionPort completion) {
+        return new MiningRuntimeProcessor(service, visual, completion, new ImmediateScheduler());
     }
 
     private static MiningSessionService service() {
@@ -122,6 +149,16 @@ class MiningRuntimeProcessorTest {
         @Override
         public void runOnRegion(WorldPosition position, Runnable task) {
             task.run();
+        }
+    }
+
+    private static final class CapturingCompletionPort implements MiningCompletionPort {
+        private final List<CompletionRequest> requests = new ArrayList<>();
+
+        @Override
+        public CompletionResult complete(CompletionRequest request) {
+            requests.add(request);
+            return new CompletionResult(CompletionStatus.SUCCESS, "ok");
         }
     }
 }

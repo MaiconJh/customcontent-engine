@@ -24,6 +24,7 @@ import com.customcontentengine.application.mechanic.MechanicBindingValidator;
 import com.customcontentengine.application.mechanic.MechanicRegistry;
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
 import com.customcontentengine.application.mining.InMemoryMiningSessionRepository;
+import com.customcontentengine.application.mining.CustomMiningCompletionService;
 import com.customcontentengine.application.mining.MiningRuntimeProcessor;
 import com.customcontentengine.application.mining.MiningSessionService;
 import com.customcontentengine.builtin.mechanic.AreaBreakMechanic;
@@ -76,9 +77,17 @@ public final class CustomContentPlugin extends JavaPlugin {
                 new InMemoryMiningSessionRepository(),
                 MiningDurationPolicy.DEFAULT);
         BukkitMiningVisualAdapter miningVisual = new BukkitMiningVisualAdapter(this);
+        CustomMiningCompletionService miningCompletion = new CustomMiningCompletionService(
+                registry,
+                blockStore,
+                worldMutation,
+                dropPort,
+                regionSafety,
+                areaBreakEventTrigger);
         MiningRuntimeProcessor miningRuntimeProcessor = new MiningRuntimeProcessor(
                 miningSessionService,
                 miningVisual,
+                miningCompletion,
                 scheduler);
 
         getServer().getPluginManager().registerEvents(new BlockPlaceAdapter(blockService, itemMetadata), this);
