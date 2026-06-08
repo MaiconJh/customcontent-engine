@@ -47,11 +47,15 @@ export async function analyze(payload: AnalyzePayload, env: Env) {
   const prompt = buildPrompt(payload, env);
   const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
   const initialFallback = !provider.ok || !provider.text;
-  const fallbackReason = initialFallback ? provider.error || "empty response" : undefined;
+  let fallbackReason = initialFallback ? provider.error || "empty response" : undefined;
   if (initialFallback) {
     console.warn(`AI provider fallback used: ${provider.error || "empty response"}`);
   }
   const initialReport = initialFallback ? localFallback(payload) : provider.text || "";
+  const metadata = (payload as { metadata?: Record<string, unknown> }).metadata;
+  const singleProviderCall = isMainPush(payload)
+    || String(metadataValue(metadata, "singleProviderCall") || "").toLowerCase() === "true"
+    || String((env as Env & { CI_AI_SINGLE_PROVIDER_CALL?: string }).CI_AI_SINGLE_PROVIDER_CALL || "").toLowerCase() === "true";
   const governancePayload = {
     ...payload,
     type: "governance",
@@ -61,7 +65,9 @@ export async function analyze(payload: AnalyzePayload, env: Env) {
   } satisfies GovernancePayload;
   const governance = initialFallback
     ? localGovernance(governancePayload, fallbackReason || "provider unavailable")
-    : await governanceReview(governancePayload, env);
+    : singleProviderCall
+      ? localGovernance(governancePayload, "main push single-provider-call mode")
+      : await governanceReview(governancePayload, env);
   const finalReport = chooseFinalReport(initialReport, governance);
   const fallback = initialFallback || governance.publishDecision === "fallback";
   const findings = payload.type === "diff" ? diffFindings(payload.diff) : failureFindings(payload.log);
@@ -210,11 +216,14 @@ export function localGovernance(payload: GovernancePayload, reason: string): Gov
   const documentationConflicts = documentationConflictHints(diff);
   const hasEvidence = Boolean(diff.trim() || ciLogs.trim() || projectContextText(payload).trim());
   const publishDecision: PublishDecision = !hasEvidence ? "fallback" : unsupportedClaims.length || documentationConflicts.length ? "publish_with_caution" : "publish";
+  const plannedLocalGovernance = /single-provider-call/i.test(reason);
 
   return {
     publishDecision,
     confidence: "low",
-    verdict: `Local governance fallback was used because the governance model failed: ${reason}.`,
+    verdict: plannedLocalGovernance
+      ? `Local governance review was used to avoid a second provider call: ${reason}.`
+      : `Local governance fallback was used because the governance model failed: ${reason}.`,
     relevance: hasEvidence ? "The report can be reviewed against provided diff, CI logs, or documentation context." : "No supporting diff, CI logs, or documentation context was available.",
     truthfulness: unsupportedClaims.length ? "Some claims require caution because local heuristics found unsupported statements." : "No unsupported claim was detected by local heuristics.",
     documentationAlignment: documentationConflicts.length ? "Potential documentation conflicts were detected by local heuristics." : "No direct documentation conflict was detected by local heuristics.",
@@ -222,6 +231,15 @@ export function localGovernance(payload: GovernancePayload, reason: string): Gov
     documentationConflicts,
     recommendedIssueBody: initial,
   };
+}
+
+function metadataValue(metadata: Record<string, unknown> | undefined, key: string): unknown {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  return (metadata as Record<string, unknown>)[key];
+}
+
+function isMainPush(payload: AnalyzePayload): boolean {
+  return payload.event === "push" && payload.branch === "main";
 }
 
 function documentationConflictHints(diff: string): string[] {

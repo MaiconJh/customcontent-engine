@@ -139,6 +139,8 @@ The model is instructed not to claim a problem unless it is supported by the dif
 
 After the initial AI report is generated, the Worker runs a governance/interceptor review. The governance reviewer audits the previous report instead of inventing a second independent report.
 
+For pushes to `main`, the Worker uses single-provider-call mode: Kilo still generates the initial report, but governance is local/heuristic to reduce timeout risk in the push workflow. Pull requests and manual `workflow_dispatch` runs may still use the full provider governance path.
+
 The governance review checks:
 
 - whether the initial report is relevant;
