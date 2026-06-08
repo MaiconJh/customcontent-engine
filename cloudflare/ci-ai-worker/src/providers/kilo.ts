@@ -1,4 +1,5 @@
 import type { Env } from "../types";
+import { sanitizeText } from "../sanitizer";
 
 export interface KiloResult {
   ok: boolean;
@@ -21,24 +22,29 @@ export async function callKiloChatCompletion(env: Env, system: string, user: str
     env.KILO_FALLBACK_MODEL || "kilo-auto/balanced",
     env.KILO_SECOND_FALLBACK_MODEL || "kilo/auto-free",
   ].filter(Boolean);
+  const errors: string[] = [];
 
   for (const model of models) {
     const attempts = [0, 1];
     for (const attempt of attempts) {
       const result = await postCompletion(endpoint, env, model, system, user);
       if (result.ok) return result;
+      if (result.error) {
+        errors.push(`${model}: ${result.error}`);
+        console.warn(`Kilo provider attempt failed for ${model}: ${result.error}`);
+      }
       if (attempt === 0 && !isTransient(result.error || "")) break;
       await sleep(150 * (attempt + 1));
     }
   }
-  return { ok: false, error: "Provider unavailable." };
+  return { ok: false, error: errors[errors.length - 1] || "provider unavailable" };
 }
 
 async function postCompletion(endpoint: string, env: Env, model: string, system: string, user: string): Promise<KiloResult> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (env.KILO_API_KEY) headers.Authorization = `Bearer ${env.KILO_API_KEY}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000);
+  const timeout = setTimeout(() => controller.abort(), Number(env.KILO_TIMEOUT_MS || "60000"));
   try {
     const res = await fetch(endpoint, {
       method: "POST",
@@ -54,12 +60,22 @@ async function postCompletion(endpoint: string, env: Env, model: string, system:
         max_tokens: 1200,
       }),
     });
-    const body = await res.json().catch(() => null) as unknown;
+    const raw = await res.text();
+    const preview = safePreview(raw);
+    let body: unknown = null;
+    try {
+      body = raw ? JSON.parse(raw) : null;
+    } catch {
+      console.warn(`Kilo provider invalid JSON for ${model}: status=${res.status} preview=${preview}`);
+      return { ok: false, model, error: "provider invalid JSON" };
+    }
+    console.warn(`Kilo provider response for ${model}: status=${res.status} preview=${preview}`);
     if (!res.ok) return { ok: false, model, error: `provider status ${res.status}` };
+    if (!body) return { ok: false, model, error: "provider empty response" };
     const text = extractText(body);
-    return text ? { ok: true, text, model } : { ok: false, model, error: "empty response" };
+    return text ? { ok: true, text, model } : { ok: false, model, error: "provider missing content" };
   } catch (error) {
-    return { ok: false, model, error: error instanceof Error ? error.message : "request failed" };
+    return { ok: false, model, error: providerError(error) };
   } finally {
     clearTimeout(timeout);
   }
@@ -72,18 +88,28 @@ function extractText(body: unknown): string {
   const content = choices?.[0]?.message && typeof choices[0].message === "object"
     ? (choices[0].message as Record<string, unknown>).content
     : undefined;
-  if (typeof content === "string") return content;
+  if (typeof content === "string" && content.trim()) return content;
   const reasoning = choices?.[0]?.message && typeof choices[0].message === "object"
     ? (choices[0].message as Record<string, unknown>).reasoning
     : undefined;
-  if (typeof reasoning === "string") return reasoning;
-  if (typeof record.output_text === "string") return record.output_text;
-  if (typeof record.text === "string") return record.text;
+  if (typeof reasoning === "string" && reasoning.trim()) return reasoning;
+  if (typeof record.output_text === "string" && record.output_text.trim()) return record.output_text;
+  if (typeof record.text === "string" && record.text.trim()) return record.text;
   return "";
 }
 
 function isTransient(error: string): boolean {
   return /429|500|502|503|504|timeout|network|abort/i.test(error);
+}
+
+function providerError(error: unknown): string {
+  if (error instanceof Error && error.name === "AbortError") return "provider timeout";
+  if (error instanceof Error) return `provider network error: ${sanitizeText(error.message, 160)}`;
+  return "provider network error";
+}
+
+function safePreview(value: string): string {
+  return sanitizeText(value || "", 500).replace(/\s+/g, " ").slice(0, 500);
 }
 
 function sleep(ms: number): Promise<void> {

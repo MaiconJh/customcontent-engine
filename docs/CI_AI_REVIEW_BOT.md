@@ -214,6 +214,7 @@ KILO_ENDPOINT=https://api.kilo.ai/api/gateway/chat/completions
 KILO_MODEL=kilo-auto/free
 KILO_FALLBACK_MODEL=kilo-auto/balanced
 KILO_SECOND_FALLBACK_MODEL=kilo/auto-free
+KILO_TIMEOUT_MS=60000
 ```
 
 `KILO_API_KEY` is optional. If it is not configured, the Worker does not send an `Authorization` header.
@@ -224,6 +225,13 @@ The parser accepts:
 - `choices[0].message.reasoning`
 
 Provider failures are logged only as safe reasons such as `provider status 401`, `provider status 403`, `provider status 404`, `provider status 429`, `empty response`, or timeout-like errors. Tokens, raw sensitive payloads, and `Authorization` are not logged.
+
+When Worker provider code or `wrangler.jsonc` changes, deploy the Worker before expecting GitHub Actions to use the updated provider diagnostics:
+
+```bash
+cd cloudflare/ci-ai-worker
+npm run deploy
+```
 
 ## Configuration
 

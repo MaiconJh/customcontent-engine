@@ -127,38 +127,26 @@ Use the GitHub Actions log as the source of truth and fix the first real failure
   }
 
   const diff = payload.diff;
-  const hints = [
-    [/build\.gradle|build\.gradle\.kts|pom\.xml/, "Build/dependency change detected."],
-    [/\.github\/workflows/, "GitHub Actions change detected; review permissions, cache, and triggers."],
-    [/docs\/adr\//, "ADR change detected; review whether the architectural decision remains consistent with scope and guardrails."],
-    [/docs\/PROJECT_SCOPE\.md/, "Project scope documentation changed; review whether generated code and claims stay within documented scope."],
-    [/docs\/ARCHITECTURE_GUARDRAILS\.md/, "Architecture guardrails changed; review boundary rules carefully."],
-    [/plugin\.yml/, "plugin.yml changed; review plugin metadata and platform declarations."],
-    [/folia-supported:\s*true/i, "Folia support declaration risk detected; verify that documentation explicitly supports the claim."],
-    [/^\+import\s+(org\.bukkit|io\.papermc)/m, "Platform import added; verify it does not enter forbidden layers."],
-    [/src\/main\//, "Production code changed."],
-    [/src\/test\//, "Tests changed."],
-    [/secrets?|env|token|permission/i, "Sensitive configuration change detected."],
-  ].filter(([regex]) => (regex as RegExp).test(diff)).map(([, msg]) => msg);
+  const classification = classifyDiff(diff);
+  const hints = fallbackHints(diff, classification);
+  const risks = fallbackRisks(classification);
   return `## Summary
 
-Diff analyzed by local fallback. ${hints.join(" ") || "No critical pattern was detected by regex."}
+Diff analyzed by local fallback. ${hints.join(" ") || "No critical pattern was detected by local file classification."}
+
+Changed file categories: ${formatCategories(classification)}.
 
 ## Technical impact
 
-Review whether the changes affect build, tests, configuration, or production behavior.
+${fallbackImpact(classification)}
 
 ## Risks
 
-Production code changes without a corresponding test diff may increase regression risk.
+${risks.join("\n\n")}
 
-## Previous vs new configuration
+## Review focus
 
-* Previous: see removed lines in the diff.
-* New: see added lines in the diff.
-* Impact: validate commands and permissions when configuration files change.
-* Risk: cache, Java version, dependencies, and permissions can change CI behavior.
-* Recommended adjustment: keep tests and documentation aligned.
+${fallbackReviewFocus(classification)}
 
 ## Guidance
 
@@ -212,6 +200,9 @@ export function localGovernance(payload: GovernancePayload, reason: string): Gov
     /Folia/i.test(initial) && !/Folia/i.test(diff + projectContextText(payload))
       ? "The report mentions Folia without clear support in the diff or documentation context."
       : "",
+    /Production code changes|Production code changed|production source files changed/i.test(initial) && !classifyDiff(diff).javaProduction
+      ? "The report claims production code changed, but the diff does not include src/main/java files."
+      : "",
   ].filter(Boolean);
   const documentationConflicts = documentationConflictHints(diff);
   const hasEvidence = Boolean(diff.trim() || ciLogs.trim() || projectContextText(payload).trim());
@@ -247,6 +238,152 @@ function documentationConflictHints(diff: string): string[] {
 
 function projectContextText(payload: GovernancePayload): string {
   return (payload.projectContext || []).map((file) => `${file.path}\n${file.content}`).join("\n");
+}
+
+interface DiffClassification {
+  files: string[];
+  javaProduction: boolean;
+  javaTests: boolean;
+  docs: boolean;
+  workflows: boolean;
+  ciScripts: boolean;
+  worker: boolean;
+  configResources: boolean;
+  unknown: boolean;
+}
+
+function classifyDiff(diff: string): DiffClassification {
+  const files = changedFiles(diff);
+  const known = new Set<string>();
+  const has = (predicate: (file: string) => boolean): boolean => {
+    const matched = files.filter(predicate);
+    matched.forEach((file) => known.add(file));
+    return matched.length > 0;
+  };
+  const javaProduction = has((file) => file.startsWith("src/main/java/"));
+  const javaTests = has((file) => file.startsWith("src/test/") || file.startsWith("src/integrationTest/") || file.startsWith("src/spike/"));
+  const docs = has((file) => file.startsWith("docs/") || file === "README.md");
+  const workflows = has((file) => file.startsWith(".github/workflows/"));
+  const ciScripts = has((file) => file.startsWith("scripts/ci/"));
+  const worker = has((file) => file.startsWith("cloudflare/ci-ai-worker/"));
+  const configResources = has((file) =>
+    file.startsWith("src/main/resources/")
+    || file.startsWith(".github/ai-review/")
+    || /^build\.gradle(\.kts)?$/.test(file)
+    || file === "settings.gradle.kts"
+    || file === "package.json"
+    || file === "package-lock.json"
+    || file.endsWith("wrangler.jsonc")
+    || file.endsWith(".yml")
+    || file.endsWith(".yaml"),
+  );
+  return {
+    files,
+    javaProduction,
+    javaTests,
+    docs,
+    workflows,
+    ciScripts,
+    worker,
+    configResources,
+    unknown: files.some((file) => !known.has(file)),
+  };
+}
+
+function changedFiles(diff: string): string[] {
+  const files = new Set<string>();
+  for (const match of diff.matchAll(/^diff --git a\/(.+?) b\/(.+)$/gm)) {
+    files.add(normalizePath(match[2]));
+  }
+  for (const match of diff.matchAll(/^\+\+\+ b\/(.+)$/gm)) {
+    if (match[1] !== "/dev/null") files.add(normalizePath(match[1]));
+  }
+  return [...files].filter(Boolean).sort();
+}
+
+function normalizePath(file: string): string {
+  return file.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function fallbackHints(diff: string, classification: DiffClassification): string[] {
+  const hints: string[] = [];
+  if (classification.workflows) hints.push("GitHub Actions workflow changes detected; review permissions, triggers, environment propagation, and report paths.");
+  if (classification.ciScripts) hints.push("CI script changes detected; review output files, fallback paths, GitHub API calls, and diagnostics.");
+  if (classification.worker) hints.push("Cloudflare Worker changes detected; review Worker deployment, provider response handling, and response schema compatibility.");
+  if (classification.docs && onlyDocs(classification)) hints.push("Documentation-only changes detected; no runtime behavior impact is inferred by local fallback.");
+  if (classification.configResources) hints.push("Configuration or resource changes detected; review metadata, build configuration, and runtime declarations.");
+  if (classification.javaProduction) hints.push("Java production source files changed.");
+  if (classification.javaTests) hints.push("Java test or spike files changed.");
+  if (/docs\/adr\//.test(diff)) hints.push("ADR change detected; review whether the architectural decision remains consistent with scope and guardrails.");
+  if (/docs\/PROJECT_SCOPE\.md/.test(diff)) hints.push("Project scope documentation changed; review whether generated code and claims stay within documented scope.");
+  if (/docs\/ARCHITECTURE_GUARDRAILS\.md/.test(diff)) hints.push("Architecture guardrails changed; review boundary rules carefully.");
+  if (/plugin\.yml/.test(diff)) hints.push("plugin.yml changed; review plugin metadata and platform declarations.");
+  if (/folia-supported:\s*true/i.test(diff)) hints.push("Folia support declaration risk detected; verify that documentation explicitly supports the claim.");
+  if (/^\+import\s+(org\.bukkit|io\.papermc)/m.test(diff)) hints.push("Platform import added; verify it does not enter forbidden layers.");
+  if (/secrets?|env|token|permission/i.test(diff)) hints.push("Sensitive configuration wording detected; verify secrets remain redacted and permissions remain minimal.");
+  return hints;
+}
+
+function fallbackImpact(classification: DiffClassification): string {
+  if (classification.javaProduction) {
+    return "Review whether Java production behavior changed and rely on GitHub Actions build/test/integrationTest for validation.";
+  }
+  if (classification.workflows || classification.ciScripts || classification.worker || classification.configResources) {
+    return "Configuration or automation changes were detected. Review workflow permissions, environment variables, report paths, provider diagnostics, deployment status, and schema compatibility.";
+  }
+  if (onlyDocs(classification)) {
+    return "Documentation changed. Local fallback does not infer runtime behavior impact from documentation-only diffs.";
+  }
+  return "Review the changed files manually; local fallback did not infer a production-code impact.";
+}
+
+function fallbackRisks(classification: DiffClassification): string[] {
+  if (classification.javaProduction && !classification.javaTests) {
+    return ["Java production source files changed without a Java test diff in this change; GitHub Actions should be used to assess regression risk."];
+  }
+  if (classification.workflows || classification.ciScripts || classification.worker || classification.configResources) {
+    return ["Configuration or automation changes may affect CI behavior, provider calls, issue/report publication, or deployment expectations."];
+  }
+  if (onlyDocs(classification)) {
+    return ["No production-code risk is inferred by local fallback for documentation-only changes."];
+  }
+  return ["No specific risk was inferred by local fallback. Manual review is still required."];
+}
+
+function fallbackReviewFocus(classification: DiffClassification): string {
+  const focus: string[] = [];
+  if (classification.workflows) focus.push("* Workflow permissions, triggers, environment variables, and report paths.");
+  if (classification.ciScripts) focus.push("* CI script output files, fallback reasons, GitHub API calls, and log clarity.");
+  if (classification.worker) focus.push("* Worker deploy status, Kilo provider diagnostics, response schema, and fallback behavior.");
+  if (classification.configResources) focus.push("* Configuration/resource metadata and runtime declarations.");
+  if (classification.javaProduction) focus.push("* Java production behavior and corresponding remote validation evidence.");
+  if (classification.docs) focus.push("* Documentation consistency with project scope, guardrails, ADRs, and milestones.");
+  return focus.length ? focus.join("\n") : "* Manually inspect the diff and compare it with repository documentation.";
+}
+
+function formatCategories(classification: DiffClassification): string {
+  const categories = [
+    classification.javaProduction ? "java production code" : "",
+    classification.javaTests ? "java tests/spikes" : "",
+    classification.docs ? "docs" : "",
+    classification.workflows ? "GitHub Actions workflows" : "",
+    classification.ciScripts ? "CI scripts" : "",
+    classification.worker ? "Cloudflare Worker" : "",
+    classification.configResources ? "config/resources" : "",
+    classification.unknown ? "unknown" : "",
+  ].filter(Boolean);
+  return categories.length ? categories.join(", ") : "none detected";
+}
+
+function onlyDocs(classification: DiffClassification): boolean {
+  return classification.docs
+    && !classification.javaProduction
+    && !classification.javaTests
+    && !classification.workflows
+    && !classification.ciScripts
+    && !classification.worker
+    && !classification.configResources
+    && !classification.unknown;
 }
 
 function parseGovernanceMarkdown(markdown: string): GovernanceReview {
@@ -307,7 +444,8 @@ function failureFindings(log: string): Finding[] {
 
 function diffFindings(diff: string): Finding[] {
   const findings: Finding[] = [];
-  if (/^\+\+\+ b\/src\/main\//m.test(diff) && !/^\+\+\+ b\/src\/test\//m.test(diff)) {
+  const classification = classifyDiff(diff);
+  if (classification.javaProduction && !classification.javaTests) {
     findings.push({ severity: "warning", title: "Production change without test diff", body: "Production code changed without a test change in the diff." });
   }
   if (/^\+\+\+ b\/\.github\/workflows\//m.test(diff) && /permissions:/m.test(diff)) {

@@ -12,6 +12,7 @@ export interface Env {
   KILO_MODEL?: string;
   KILO_FALLBACK_MODEL?: string;
   KILO_SECOND_FALLBACK_MODEL?: string;
+  KILO_TIMEOUT_MS?: string;
   KILO_API_KEY?: string;
 }
 
