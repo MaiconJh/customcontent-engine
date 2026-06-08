@@ -80,6 +80,22 @@ class MiningInputAdapterTest {
     }
 
     @Test
+    void blockDamageDoesNotStartSessionWhenBlockHasNoMiningHardness() {
+        MiningSessionService service = service();
+        MiningInputAdapter adapter = adapter(
+                registryWithoutBlockMining(),
+                new FixedBlockStore(Optional.of((short) 1)),
+                new FixedItemMetadataPort(Optional.of(TOOL_ID)),
+                service);
+        BlockDamageEvent event = blockDamageEventAt(TARGET);
+
+        adapter.onBlockDamage(event);
+
+        verify(event, never()).setCancelled(true);
+        assertFalse(service.getActiveSession(ACTOR_KEY).isPresent());
+    }
+
+    @Test
     void blockDamageDoesNotStartSessionWhenItemHasNoMiningSpeed() {
         MiningSessionService service = service();
         MiningInputAdapter adapter = adapter(
@@ -194,6 +210,12 @@ class MiningInputAdapterTest {
                 List.of(
                         item("ruby", Optional.empty()),
                         item("ruby_pickaxe", Optional.of(new MiningSpeed(8.0D)))));
+    }
+
+    private static DefinitionRegistry registryWithoutBlockMining() {
+        return new DefinitionRegistry(
+                List.of(block("ruby_ore", (short) 1, Optional.empty())),
+                List.of(item("ruby_pickaxe", Optional.of(new MiningSpeed(8.0D)))));
     }
 
     private static BlockDef block(String id, short numericId, Optional<MiningHardness> miningHardness) {

@@ -388,3 +388,22 @@ Phase 2 implements only pure mining calculation and session state:
 - immutable session identity and timing state.
 
 This phase does not implement active session storage, event adapters, visual adapters, scheduler drivers, custom break timing, world mutation, drops, or `on_block_break` runtime integration.
+
+## 17. Phase 3-8 Implementation Status
+
+Phases 3 through 8 have been implemented as the conservative MVP-2 hardening path:
+
+- Phase 3 added application-level in-memory session management.
+- Phase 4 added runtime update modeling plus visual and completion ports.
+- Phase 5 added Bukkit/Paper input adapters for damage, abort, quit, and held-item changes.
+- Phase 6 added controlled active-session processing and a Bukkit/Paper visual progress adapter.
+- Phase 7 added real custom mining completion through ports, including identity removal, world mutation, drops, and `mechanics.on_block_break`.
+- Phase 8 added end-to-end hardening tests for duplicate completion, cancellation, missing mining configuration, unsafe regions, removed blocks, visual cleanup, and existing break/mechanic compatibility.
+
+The implementation remains inside the accepted ADR 0009 boundary:
+
+- no new mechanic;
+- no fake block break event flow;
+- no scheduler contract change;
+- no Bukkit/Paper dependency in application or domain;
+- no `runAsync`, `runOnEntity`, `SchedulerAccess`, NMS, reflection, scripting, permissions, or declared Folia support.

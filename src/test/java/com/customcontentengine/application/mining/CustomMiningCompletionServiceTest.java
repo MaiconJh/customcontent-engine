@@ -6,10 +6,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
+import com.customcontentengine.application.mechanic.AreaBreakRuntimeService;
+import com.customcontentengine.application.mechanic.MechanicRegistry;
+import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
+import com.customcontentengine.builtin.mechanic.AreaBreakMechanic;
 import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
+import com.customcontentengine.domain.mechanic.MechanicBinding;
+import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
+import com.customcontentengine.domain.mechanic.MechanicTrigger;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
@@ -18,9 +25,12 @@ import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.DropPort;
 import com.customcontentengine.port.MiningCompletionPort;
 import com.customcontentengine.port.RegionSafetyPort;
+import com.customcontentengine.port.SchedulerPort;
 import com.customcontentengine.port.WorldMutationPort;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -118,6 +128,45 @@ class CustomMiningCompletionServiceTest {
         verify(triggerService).trigger(TOOL_ID, TARGET, ACTOR_KEY);
     }
 
+    @Test
+    void areaBreakContinuesWorkingAfterCustomMiningCompletion() {
+        AreaBlockStore blockStore = new AreaBlockStore();
+        flatArea(TARGET).forEach(position -> blockStore.blocks.put(position, (short) 1));
+        CapturingWorldMutation worldMutation = new CapturingWorldMutation();
+        CapturingDropPort dropPort = new CapturingDropPort();
+        DefinitionRegistry registry = registryWithAreaBreakBinding();
+        AreaBreakEventTriggerService triggerService = new AreaBreakEventTriggerService(
+                registry.mechanicBindings(),
+                AreaBreakMechanic.ID,
+                new AreaBreakRuntimeService(
+                        new MechanicRegistry(List.of(new AreaBreakMechanic())),
+                        AreaBreakMechanic.ID,
+                        registry,
+                        blockStore,
+                        dropPort,
+                        worldMutation,
+                        new InMemoryCooldowns(),
+                        new ImmediateScheduler(),
+                        position -> true));
+        CustomMiningCompletionService service = new CustomMiningCompletionService(
+                registry,
+                blockStore,
+                worldMutation,
+                dropPort,
+                position -> true,
+                triggerService);
+
+        MiningCompletionPort.CompletionResult result = service.complete(request(TOOL_ID));
+
+        assertEquals(MiningCompletionPort.CompletionStatus.SUCCESS, result.status());
+        assertEquals(9, blockStore.removed.size());
+        assertEquals(1, blockStore.removed.stream().filter(TARGET::equals).count());
+        assertEquals(9, worldMutation.positions.size());
+        assertEquals(1, worldMutation.positions.stream().filter(TARGET::equals).count());
+        assertEquals(9, dropPort.positions.size());
+        assertEquals(1, dropPort.positions.stream().filter(TARGET::equals).count());
+    }
+
     private static CustomMiningCompletionService service(
             FakeBlockStore blockStore,
             CapturingWorldMutation worldMutation,
@@ -143,6 +192,26 @@ class CustomMiningCompletionServiceTest {
                 List.of(
                         item("ruby_pickaxe"),
                         item("ruby")));
+    }
+
+    private static DefinitionRegistry registryWithAreaBreakBinding() {
+        return new DefinitionRegistry(
+                List.of(block("ruby_ore", (short) 1)),
+                List.of(item("ruby_pickaxe")),
+                new MechanicBindingRegistry(List.of(new MechanicBinding(
+                        TOOL_ID,
+                        MechanicTrigger.ON_BLOCK_BREAK,
+                        AreaBreakMechanic.ID))));
+    }
+
+    private static List<WorldPosition> flatArea(WorldPosition origin) {
+        List<WorldPosition> positions = new ArrayList<>();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                positions.add(new WorldPosition(origin.worldName(), origin.x() + dx, origin.y(), origin.z() + dz));
+            }
+        }
+        return positions;
     }
 
     private static BlockDef block(String id, short numericId) {
@@ -201,6 +270,34 @@ class CustomMiningCompletionServiceTest {
         @Override
         public void drop(WorldPosition position, DropTable drops) {
             positions.add(position);
+        }
+    }
+
+    private static final class AreaBlockStore implements BlockStorePort {
+        private final Map<WorldPosition, Short> blocks = new HashMap<>();
+        private final List<WorldPosition> removed = new ArrayList<>();
+
+        @Override
+        public Optional<Short> findNumericId(WorldPosition position) {
+            return Optional.ofNullable(blocks.get(position));
+        }
+
+        @Override
+        public void put(WorldPosition position, short numericId) {
+            blocks.put(position, numericId);
+        }
+
+        @Override
+        public void remove(WorldPosition position) {
+            removed.add(position);
+            blocks.remove(position);
+        }
+    }
+
+    private static final class ImmediateScheduler implements SchedulerPort {
+        @Override
+        public void runOnRegion(WorldPosition position, Runnable task) {
+            task.run();
         }
     }
 }

@@ -84,6 +84,23 @@ class MiningRuntimeProcessorTest {
     }
 
     @Test
+    void canceledSessionDoesNotCompleteOrMutate() {
+        MiningSessionService service = service();
+        CapturingVisualPort visual = new CapturingVisualPort();
+        CapturingCompletionPort completion = new CapturingCompletionPort();
+        MiningRuntimeProcessor processor = processor(service, visual, completion);
+        service.startSession(ACTOR_KEY, TARGET, TOOL_ID, new MiningHardness(2.0D), new MiningSpeed(1.0D), 1000L);
+        service.cancelSession(ACTOR_KEY);
+
+        MiningRuntimeUpdate update = processor.processSession(ACTOR_KEY, TARGET, 3000L);
+
+        assertEquals(MiningRuntimeUpdate.VisualAction.NONE, update.visualAction());
+        assertEquals(0, completion.requests.size());
+        assertEquals(0, visual.updates.size());
+        assertEquals(0, visual.clears.size());
+    }
+
+    @Test
     void absenceOfSessionDoesNotTouchVisualPort() {
         MiningSessionService service = service();
         CapturingVisualPort visual = new CapturingVisualPort();
