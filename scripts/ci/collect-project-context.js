@@ -20,6 +20,9 @@ function isIgnoredByPolicy(file) {
   return normalized === ".env"
     || normalized.startsWith(".env.")
     || normalized === ".dev.vars"
+    || normalized.includes("/secrets/")
+    || normalized.includes("/secret/")
+    || /(^|\/)secrets?\./i.test(normalized)
     || normalized.startsWith("node_modules/")
     || normalized.includes("/node_modules/")
     || normalized.startsWith("build/")
@@ -48,7 +51,7 @@ function candidates() {
   return [...staticFiles, ...globbed]
     .map(normalizePath)
     .filter((file, index, all) => all.indexOf(file) === index)
-    .filter((file) => !isIgnoredByPolicy(file) && fs.existsSync(file) && fs.statSync(file).isFile());
+    .filter((file) => !isIgnoredByPolicy(file) && fs.existsSync(file) && fs.statSync(file).isFile() && !isBinaryFile(file));
 }
 
 function listMarkdown(dir) {
@@ -84,6 +87,17 @@ function collect() {
     maxTotalChars,
     files,
   };
+}
+
+function isBinaryFile(file) {
+  const buffer = fs.readFileSync(file);
+  if (buffer.includes(0)) return true;
+  const sample = buffer.subarray(0, Math.min(buffer.length, 8000));
+  let suspicious = 0;
+  for (const byte of sample) {
+    if (byte < 7 || (byte > 14 && byte < 32)) suspicious += 1;
+  }
+  return sample.length > 0 && suspicious / sample.length > 0.3;
 }
 
 function main() {

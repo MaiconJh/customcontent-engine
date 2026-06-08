@@ -87,7 +87,7 @@ function payload(type) {
 function summarize(name, result) {
   const body = result.body || {};
   const suffix = body.ok
-    ? `ok=true fallback=${Boolean(body.fallback)} decision=${body.governance?.publishDecision || "n/a"} summary="${String(body.summary || "").slice(0, 120)}"`
+    ? `ok=true fallback=${Boolean(body.fallback)} summary="${String(body.summary || "").slice(0, 120)}"`
     : `ok=false error=${body.error?.code || "UNKNOWN"} message="${body.error?.message || "No JSON body"}"`;
   console.log(`${name}: HTTP ${result.status} ${suffix}`);
 }

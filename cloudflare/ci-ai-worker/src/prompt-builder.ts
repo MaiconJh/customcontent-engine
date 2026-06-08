@@ -1,4 +1,4 @@
-import type { AnalyzePayload, Env, GovernancePayload, ProjectContextFile } from "./types";
+import type { AnalyzePayload, Env, ProjectContextFile } from "./types";
 import { maxModelInputChars } from "./security";
 import { sanitizeText } from "./sanitizer";
 
@@ -104,56 +104,6 @@ ${ciLogs}
 
 Repository documentation context:
 ${context}`, limit),
-  };
-}
-
-export function buildGovernancePrompt(payload: GovernancePayload, env: Env): { system: string; user: string } {
-  const limit = maxModelInputChars(env);
-  return {
-    system: `${SYSTEM_PROMPT}
-You are now acting as a governance interceptor. Review the previous AI report for relevance, factual support, and alignment with repository documentation. Return only English Markdown.`,
-    user: sanitizeText(`Repository: ${payload.repository}
-Event: ${payload.event}
-Branch: ${payload.branch}
-Commit: ${payload.commit}
-Workflow: ${payload.workflow}
-Run URL: ${payload.run_url}
-
-Review inputs:
-
-Git diff:
-${payload.diff || ""}
-
-GitHub Actions result/logs:
-${payload.ciLogs || payload.log || ""}
-
-Repository documentation context:
-${formatProjectContext(payload.projectContext || [])}
-
-First AI report:
-${payload.report}
-
-Answer these governance questions:
-- Is the report relevant?
-- Is the report factually supported?
-- Are there unsupported claims?
-- Did the report miss a major documentation conflict?
-- Did the report overstate a risk?
-- Does the report align with the project scope and ADRs?
-- Should the issue/comment be published as-is, downgraded, amended, or suppressed?
-
-Return Markdown with:
-
-## AI Governance Review
-### Verdict
-### Relevance
-### Truthfulness Check
-### Documentation Alignment
-### Unsupported Claims
-### Documentation Conflicts
-### Publish Decision
-
-Allowed publish decisions: publish, publish_with_caution, suppress, fallback.`, limit),
   };
 }
 

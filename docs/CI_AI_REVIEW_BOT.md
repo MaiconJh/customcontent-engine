@@ -1,10 +1,10 @@
-# CI AI Governance Bot
+# CI AI Review Bot
 
 ## What It Is
 
-CI AI Governance Bot is a documentation-driven review layer for this repository. It does not replace GitHub Actions and it does not ask maintainers to run local Gradle validation. GitHub Actions is the source of truth for build, test, and integrationTest results.
+CI AI Review Bot is a documentation-aware review layer for this repository. It does not replace GitHub Actions and it does not ask maintainers to run local Gradle validation. GitHub Actions is the source of truth for build, test, and integrationTest results.
 
-The bot collects the git diff, GitHub Actions result/logs, and relevant repository documentation, sends that context to the Cloudflare Worker, asks Kilo Code for an initial report, and then runs a governance/interceptor review that checks whether the report is relevant, factual, and aligned with the documented project scope.
+The bot collects the git diff, GitHub Actions result/logs, and relevant repository documentation, sends that context to the Cloudflare Worker, and asks Kilo Code for an initial report grounded in the repository's documented scope.
 
 ## Architecture
 
@@ -15,7 +15,6 @@ GitHub Actions
 -> sanitize payload
 -> Cloudflare Worker
 -> Kilo Gateway initial report
--> Kilo Gateway governance review
 -> Markdown response
 -> GitHub issue/comment
 ```
@@ -33,12 +32,22 @@ All heavy validation happens in GitHub Actions. Local scripts are only diagnosti
 - `README.md`
 - `src/main/resources/plugin.yml`
 - `src/main/resources/definitions.yml`
-- `.github/workflows/build-test.yml`
-- `.github/workflows/ci-ai-review.yml`
 - `build.gradle.kts`
 - `settings.gradle.kts`
+- `.github/workflows/build-test.yml`
+- `.github/workflows/ci-ai-review.yml`
 
-The collector preserves file paths, limits total payload size, truncates long files with a clear marker, sanitizes content, and skips ignored/local-sensitive areas such as `.env`, `.env.*`, `.dev.vars`, `node_modules`, `.gradle`, `.kilo`, `.wrangler`, `.vscode`, and build outputs.
+Each collected item has:
+
+```json
+{
+  "path": "docs/PROJECT_SCOPE.md",
+  "content": "...",
+  "truncated": false
+}
+```
+
+The collector preserves file paths, limits total payload size, limits per-file size, truncates long files with a clear marker, sanitizes content, rejects binary files, and skips ignored/local-sensitive areas such as `.env`, `.env.*`, `.dev.vars`, `node_modules`, `.gradle`, `.kilo`, `.wrangler`, `.vscode`, secrets paths, and build outputs.
 
 ## Initial AI Report
 
@@ -48,51 +57,22 @@ The Worker asks Kilo Code to review the change using:
 2. GitHub Actions result/logs.
 3. Repository documentation context.
 
-The prompt asks the model to determine whether the change is consistent with the documented architecture and scope. It checks for scope violations, guardrail violations, ADR contradictions, forbidden dependencies, local-only validation assumptions, plugin metadata risks, unsupported Folia claims, and behavior not documented by the repository.
+The prompt asks the model to check:
 
-The report separates:
-
-- Confirmed findings
-- Possible risks
-- Unsupported claims
-- Documentation divergence
-- Suggested follow-up
+- consistency with `docs/PROJECT_SCOPE.md`;
+- consistency with `docs/ARCHITECTURE_GUARDRAILS.md`;
+- consistency with ADRs;
+- consistency with milestones;
+- out-of-scope behavior;
+- architectural boundary violations;
+- unsupported claims;
+- local-only validation assumptions.
 
 The model is instructed not to claim a problem unless it is supported by the diff, CI logs, or documentation context.
 
-## Governance Review
+## Future Governance Review
 
-After the first report, the Worker runs a second governance/interceptor review. The governance review receives:
-
-- git diff
-- GitHub Actions result/logs
-- project documentation context
-- first AI report
-
-It checks:
-
-- Is the report relevant?
-- Is the report factually supported?
-- Are there unsupported claims?
-- Did the report miss a major documentation conflict?
-- Did the report overstate a risk?
-- Does the report align with project scope and ADRs?
-- Should the issue/comment be published as-is, published with caution, suppressed, or treated as fallback?
-
-The governance verdict uses this shape:
-
-```json
-{
-  "publishDecision": "publish|publish_with_caution|suppress|fallback",
-  "confidence": "high|medium|low",
-  "verdict": "...",
-  "unsupportedClaims": [],
-  "documentationConflicts": [],
-  "recommendedIssueBody": "..."
-}
-```
-
-The GitHub issue/comment includes the initial report and the governance review so maintainers can see both the analysis and the interceptor verdict.
+Governance/interceptor review is planned as a later Continuous AI Evolution phase. It is not part of this step.
 
 ## GitHub Behavior
 
@@ -100,7 +80,7 @@ For pull requests, the bot creates or updates one deduplicated PR comment using 
 
 For pushes to `main`, the bot creates or updates one deduplicated technical note issue. The body includes hidden commit/run markers so the note remains traceable without creating spam.
 
-For CI failures, the bot creates or reuses a `ci-failure` issue and includes GitHub Actions failure evidence plus governance review.
+For CI failures, the bot creates or reuses a `ci-failure` issue and includes GitHub Actions failure evidence.
 
 The bot must never mask a real build/test/integrationTest failure. AI/provider failures are non-blocking; GitHub Actions validation remains authoritative.
 
@@ -115,8 +95,6 @@ If Kilo does not return a usable response, the Worker uses local fallback. The f
 - `plugin.yml` metadata changes
 - `folia-supported: true` declarations
 - GitHub Actions permission/cache/trigger changes
-
-The fallback governance review also checks for unsupported claims such as local Gradle validation instructions or Folia claims not supported by the diff/documentation context.
 
 ## Kilo Provider
 
@@ -204,7 +182,7 @@ The workflow uses `pull_request`, not `pull_request_target`. Secrets are not exp
 
 - Worker not configured: set `CI_AI_WORKER_URL` in Actions variables.
 - Missing `CI_AI_WORKER_URL`: build/test/integrationTest still runs and analysis uses fallback.
-- Kilo unavailable: the Worker returns local fallback plus governance fallback.
+- Kilo unavailable: the Worker returns local fallback.
 - Invalid model: the provider tries `KILO_FALLBACK_MODEL` and `KILO_SECOND_FALLBACK_MODEL`.
 - "Local fallback was used": the Worker received the payload, but Kilo Gateway returned an error, empty response, timeout, or required authentication.
 - Rate limited: increase limits carefully or wait for the window to expire.
