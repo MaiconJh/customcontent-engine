@@ -216,6 +216,22 @@ The planning endpoint warns strongly when an issue asks for guarded or out-of-sc
 
 If the Worker or Kilo is unavailable, the script publishes a conservative local fallback plan with the precise fallback reason. Validation guidance must remain remote-only: GitHub Actions build/test/integrationTest and CI AI Governance Bot.
 
+## Approved Plan Pull Requests
+
+`.github/workflows/ai-approved-plan-pr.yml` creates or updates a planning-only pull request when a maintainer adds `ai:approved` to an issue that already has `ai:plan`.
+
+The approved plan PR flow:
+
+- reads the issue and its labels;
+- finds the deduplicated AI plan comment marked with `<!-- customcontent-engine:ai-plan -->`;
+- creates or updates the branch `ai/approved-plan-issue-<issue-number>`;
+- writes `docs/ai-plans/issue-<issue-number>-approved-plan.md`;
+- opens or updates one pull request targeting `main`.
+
+The PR is a controlled handoff artifact only. It must not edit Java, YAML definitions, plugin resources, Gradle files, production source files, or `.github/workflows/build-test.yml`. It must not auto-merge. The next human action is to review the plan, adjust it if needed, and implement separately in a dedicated implementation commit or PR.
+
+The handoff file records the issue title, issue URL, source labels, approved plan snapshot, implementation checklist, validation checklist, non-goals, and human review requirement. GitHub Actions remains the validation source of truth for any later implementation work.
+
 ## Fallback Behavior
 
 If Kilo does not return a usable response, the Worker uses local fallback. The fallback is in English and considers basic documentation-sensitive signals, including:

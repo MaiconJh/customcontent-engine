@@ -1,0 +1,50 @@
+name: AI Approved Plan PR
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number with ai:plan and ai:approved labels.
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+
+jobs:
+  approved-plan-pr:
+    name: Create or update approved planning PR
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'issues' &&
+        github.event.action == 'labeled' &&
+        github.event.label.name == 'ai:approved' &&
+        contains(github.event.issue.labels.*.name, 'ai:plan') &&
+        contains(github.event.issue.labels.*.name, 'ai:approved')
+      )
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Create or update approved planning PR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF: ${{ github.ref }}
+          TARGET_BRANCH: main
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
+        run: node scripts/ci/create-approved-plan-pr.js
