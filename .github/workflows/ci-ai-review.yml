@@ -107,12 +107,17 @@ jobs:
           MAX_INLINE_COMMENTS: "10"
         run: node scripts/ci/create-or-update-comment.js --marker '<!-- ai-ci-review-bot:summary -->' --body-file ai-response.md --findings-file ai-findings.json
 
+      - name: Diagnose push technical note
+        if: github.event_name == 'push'
+        run: |
+          node -e 'const fs=require("fs"); const response=fs.existsSync("ai-response.json") ? JSON.parse(fs.readFileSync("ai-response.json","utf8")) : {}; const markdown=fs.existsSync("ai-response.md") ? fs.readFileSync("ai-response.md","utf8") : ""; console.log("Push note diagnostics: event=" + process.env.GITHUB_EVENT_NAME); console.log("Push note diagnostics: ref=" + process.env.GITHUB_REF); console.log("Push note diagnostics: branch=" + process.env.GITHUB_REF_NAME); console.log("Push note diagnostics: commit=" + process.env.GITHUB_SHA); console.log("Push note diagnostics: enabled=true"); console.log("Push note diagnostics: reportExists=" + fs.existsSync("ai-response.md")); console.log("Push note diagnostics: finalReportLength=" + String(response.finalReport || response.markdown || markdown || "").length); console.log("Push note diagnostics: publishDecision=" + ((response.governanceReview && response.governanceReview.publishDecision) || response.publishDecision || "unknown")); console.log("Push note diagnostics: fallbackUsed=" + Boolean(response.fallbackUsed)); if (response.fallbackReason) console.log("Push note diagnostics: fallbackReason=" + response.fallbackReason);'
+
       - name: Publish main push note
         if: github.event_name == 'push'
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/ci/create-or-update-push-note.js --body-file ai-response.md --labels automated,ai-analysis
+        run: node scripts/ci/create-or-update-push-note.js --body-file ai-response.md --response-file ai-response.json --labels automated,ai-analysis
 
   failure-report:
     runs-on: ubuntu-latest

@@ -20,6 +20,14 @@ issues:
     - automated
     - ai-analysis
 
+push_notes:
+  enabled: true
+  title: "AI Technical Note: main"
+  reopen_closed: true
+  labels:
+    - automated
+    - ai-analysis
+
 worker:
   endpoint_env: CI_AI_WORKER_URL
   require_shared_secret: false
