@@ -63,7 +63,7 @@ function candidates() {
   ];
   return [...primaryDocs, ...generatedDocs, ...supportingFiles]
     .map((file, index) => ({ file: normalizePath(file), index }))
-    .filter(({ file }, _idx, all) => all.find((item) => item.file === file)?.index === idx)
+    .filter(({ file }, _idx, all) => all.find((item) => item.file === file)?.index === _idx)
     .filter(({ file }) => !isIgnoredByPolicy(file) && fs.existsSync(file) && fs.statSync(file).isFile() && !isBinaryFile(file))
     .map(({ file }) => file);
 }
