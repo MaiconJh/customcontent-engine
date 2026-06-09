@@ -9,7 +9,7 @@ The project follows a conservative-but-evolvable core model: the core stays smal
 - MVP-0: Complete.
 - MVP-1: Complete for the controlled `area_break` scope.
 - MVP-2: Complete for the custom mining scope.
-- Current phase: Post-MVP-2 planning and hardening.
+- MVP-3: Complete for custom tool durability and wear.
 - Folia: architectural goal; advanced cross-region behavior is not promised as final support yet.
 - Public API: not stable and not available yet.
 
@@ -83,7 +83,7 @@ Layer summary:
 - `internalapi`: internal mechanic and identity contracts used by the engine.
 - `domain`: pure Java model for definitions, policies, identifiers, immutable registries, and pure mining values.
 - `application`: orchestration layer for items, blocks, mechanics, budgets, cooldowns, mining sessions, and runtime composition.
-- `port`: interfaces for infrastructure such as block storage, drops, item metadata, scheduling, region safety, visual mining progress, world mutation, and protection.
+- `port`: interfaces for infrastructure such as block storage, drops, item metadata, scheduling, region safety, visual mining progress, world mutation, protection, and tool wear.
 - `adapter`: platform and infrastructure implementations for Bukkit/Paper, PDC, YAML, commands, listeners, mining input, and mining visuals.
 - `builtin`: official mechanics such as `area_break`; official does not mean stable public API.
 - `experimental`: reserved for future incubating modules or candidate contracts.
@@ -239,6 +239,41 @@ Completion guarantees:
 - fake `BlockBreakEvent` is not used;
 - `Bukkit#callEvent` is not used to simulate block breaking.
 
+## MVP-3
+
+MVP-3 is complete for custom tool durability and wear.
+
+MVP-3 adds a minimal durability system for custom tools used in custom mining:
+
+- Optional `durability` section in `items.<id>` YAML.
+- `durability.max` — Maximum durability (positive integer).
+- `durability.damage_on_custom_block_break` — Damage from mining (zero or positive, defaults to 0).
+- `durability.break_when_zero` — Remove tool at zero (defaults to `true`).
+
+Example YAML:
+
+```yaml
+items:
+  ruby_pickaxe:
+    material_base: DIAMOND_PICKAXE
+    custom_model_data: 2001
+    durability:
+      max: 500
+      damage_on_custom_block_break: 1
+      break_when_zero: true
+```
+
+Durability behavior:
+
+- Custom items initialize durability to `max` on creation.
+- Durability is stored in PDC and persists across sessions.
+- Wear applies once per successful custom mining completion.
+- Vanilla block breaking does not affect custom tool durability.
+- AreaBreak does not multiply durability damage (one wear per completion).
+- Tools at zero durability are removed if `break_when_zero: true` or preserved if `false`.
+
+MVP-3 Limitation: Tool durability wear is applied once per custom mining completion, regardless of how many blocks are broken by AreaBreak. Additional blocks broken by `area_break` do not multiply the durability damage.
+
 ## Current Limitations
 
 - No second mechanic beyond `area_break`.
@@ -249,7 +284,7 @@ Completion guarantees:
 - No Efficiency enchantment support.
 - No advanced tool tiers.
 - No multiple-player shared mining of the same block in the current scope.
-- No full durability mechanic logic.
+- No repair system for custom tool durability (mending, crafting, anvil).
 - No complex permission system.
 - No WorldGuard or GriefPrevention integration.
 - No advanced Folia cross-region automation.
@@ -353,6 +388,7 @@ rg 'Bukkit#callEvent|callEvent\(|BlockBreakEvent' src/main/java/com/customconten
 - `docs/milestones/MVP-0-COMPLETE.md`
 - `docs/milestones/MVP-1-COMPLETE.md`
 - `docs/milestones/MVP-2-COMPLETE.md`
+- `docs/milestones/MVP-3-COMPLETE.md`
 
 Important ADRs:
 

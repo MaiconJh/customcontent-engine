@@ -64,12 +64,26 @@ public final class YamlDefinitionValidator {
         requireNumber(attributes, "items." + id + ".attributes.damage", "damage");
         requireNumber(attributes, "items." + id + ".attributes.speed", "speed");
         requirePositiveInt(attributes, "items." + id + ".attributes.durability", "durability");
-        if (section.contains("mining")) {
+if (section.contains("mining")) {
             ConfigurationSection mining = requireSection(section, "items." + id + ".mining", "mining");
             requireNumber(mining, "items." + id + ".mining.speed", "speed");
             double speed = mining.getDouble("speed");
             if (speed <= 0.0D) {
                 throw error("items." + id + ".mining.speed must be greater than zero but was " + speed);
+            }
+        }
+        if (section.contains("durability")) {
+            ConfigurationSection durability = requireSection(section, "items." + id + ".durability", "durability");
+            requireInt(durability, "items." + id + ".durability.max", "max");
+            int max = durability.getInt("max");
+            if (max <= 0) {
+                throw error("items." + id + ".durability.max must be greater than zero but was " + max);
+            }
+            if (durability.isInt("damage_on_custom_block_break")) {
+                int damage = durability.getInt("damage_on_custom_block_break");
+                if (damage < 0) {
+                    throw error("items." + id + ".durability.damage_on_custom_block_break must not be negative but was " + damage);
+                }
             }
         }
         if (section.contains("mechanics")) {

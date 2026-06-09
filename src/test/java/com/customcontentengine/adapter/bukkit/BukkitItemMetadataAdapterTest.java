@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
+import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import java.util.function.Consumer;
 import org.bukkit.Material;
@@ -20,7 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class BukkitItemMetadataAdapterTest {
-    private static final NamespacedKey KEY = new NamespacedKey("customcontentengine", "custom_item_id");
+    private static final NamespacedKey ID_KEY = new NamespacedKey("customcontentengine", "custom_item_id");
+    private static final NamespacedKey DURABILITY_KEY = new NamespacedKey("customcontentengine", "tool_durability");
 
     @Test
     void createsItemWithMaterialCustomModelDataAndPdcIdentity() {
@@ -34,7 +36,8 @@ class BukkitItemMetadataAdapterTest {
             return true;
         });
         BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(
-                KEY,
+                ID_KEY,
+                DURABILITY_KEY,
                 material -> {
                     assertEquals(Material.DIAMOND_PICKAXE, material);
                     return item;
@@ -50,7 +53,7 @@ class BukkitItemMetadataAdapterTest {
 
         assertEquals(item, created);
         verify(meta).setCustomModelData(2001);
-        verify(container).set(KEY, PersistentDataType.STRING, "ruby_pickaxe");
+        verify(container).set(ID_KEY, PersistentDataType.STRING, "ruby_pickaxe");
     }
 
     @Test
@@ -61,8 +64,8 @@ class BukkitItemMetadataAdapterTest {
         when(item.hasItemMeta()).thenReturn(true);
         when(item.getItemMeta()).thenReturn(meta);
         when(meta.getPersistentDataContainer()).thenReturn(container);
-        when(container.get(KEY, PersistentDataType.STRING)).thenReturn("ruby_pickaxe");
-        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(KEY, material -> item);
+        when(container.get(ID_KEY, PersistentDataType.STRING)).thenReturn("ruby_pickaxe");
+        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item);
 
         assertEquals(new CustomItemId("ruby_pickaxe"), adapter.readCustomItemIdentity(item).orElseThrow());
     }
@@ -76,12 +79,37 @@ class BukkitItemMetadataAdapterTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Consumer<ItemMeta>> editorCaptor = ArgumentCaptor.forClass(Consumer.class);
         when(item.editMeta(editorCaptor.capture())).thenReturn(true);
-        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(KEY, material -> item);
+        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item);
 
         adapter.applyCustomItemIdentity(item, new CustomItemId("ruby_pickaxe"));
         editorCaptor.getValue().accept(meta);
 
         verify(item).editMeta(org.mockito.ArgumentMatchers.<Consumer<ItemMeta>>any());
-        verify(container).set(eq(KEY), eq(PersistentDataType.STRING), eq("ruby_pickaxe"));
+        verify(container).set(eq(ID_KEY), eq(PersistentDataType.STRING), eq("ruby_pickaxe"));
+    }
+
+    @Test
+    void writesAndReadsCurrentDurability() {
+        ItemStack item = mock(ItemStack.class);
+        ItemMeta meta = mock(ItemMeta.class);
+        PersistentDataContainer container = mock(PersistentDataContainer.class);
+        when(meta.getPersistentDataContainer()).thenReturn(container);
+        when(item.hasItemMeta()).thenReturn(true);
+        when(item.getItemMeta()).thenReturn(meta);
+        when(item.editMeta(org.mockito.ArgumentMatchers.<Consumer<ItemMeta>>any())).thenReturn(true);
+        when(container.get(DURABILITY_KEY, PersistentDataType.INTEGER)).thenReturn(495);
+
+        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item);
+
+        ToolDurability written = adapter.initialDurabilityFor(500);
+        assertEquals(500, written.max());
+        assertEquals(500, written.current());
+
+        adapter.writeCurrentDurability(item, new ToolDurability(500, 495));
+        verify(container).set(eq(DURABILITY_KEY), eq(PersistentDataType.INTEGER), eq(495));
+
+        Optional<ToolDurability> read = adapter.readCurrentDurability(item, 500);
+        assertEquals(500, read.orElseThrow().max());
+        assertEquals(495, read.orElseThrow().current());
     }
 }

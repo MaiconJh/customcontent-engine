@@ -4,6 +4,8 @@ import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
+import com.customcontentengine.domain.durability.ToolBreakPolicy;
+import com.customcontentengine.domain.durability.ToolDurabilityDefinition;
 import com.customcontentengine.domain.mechanic.MechanicBinding;
 import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
 import com.customcontentengine.domain.mechanic.MechanicTrigger;
@@ -77,7 +79,7 @@ public final class YamlDefinitionLoader {
         return drops;
     }
 
-    private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
+private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
         List<ItemDef> items = new ArrayList<>();
         for (String id : itemsSection.getKeys(false)) {
             ConfigurationSection section = itemsSection.getConfigurationSection(id);
@@ -92,7 +94,8 @@ public final class YamlDefinitionLoader {
                             attributes.getDouble("speed"),
                             attributes.getInt("durability")
                     ),
-                    loadMiningSpeed(section)
+                    loadMiningSpeed(section),
+                    loadDurability(section)
             ));
         }
         return items;
@@ -105,11 +108,25 @@ public final class YamlDefinitionLoader {
         return Optional.of(new MiningHardness(section.getConfigurationSection("mining").getDouble("hardness")));
     }
 
-    private Optional<MiningSpeed> loadMiningSpeed(ConfigurationSection section) {
+private Optional<MiningSpeed> loadMiningSpeed(ConfigurationSection section) {
         if (!section.contains("mining")) {
             return Optional.empty();
         }
         return Optional.of(new MiningSpeed(section.getConfigurationSection("mining").getDouble("speed")));
+    }
+
+    private Optional<ToolDurabilityDefinition> loadDurability(ConfigurationSection section) {
+        if (!section.contains("durability")) {
+            return Optional.empty();
+        }
+        ConfigurationSection durability = section.getConfigurationSection("durability");
+        int max = durability.getInt("max");
+        int damage = durability.getInt("damage_on_custom_block_break", 0);
+        boolean breakWhenZero = durability.getBoolean("break_when_zero", true);
+        return Optional.of(new ToolDurabilityDefinition(
+                max,
+                damage,
+                breakWhenZero ? ToolBreakPolicy.BREAK : ToolBreakPolicy.PRESERVE));
     }
 
     private MechanicBindingRegistry loadMechanicBindings(ConfigurationSection itemsSection) {

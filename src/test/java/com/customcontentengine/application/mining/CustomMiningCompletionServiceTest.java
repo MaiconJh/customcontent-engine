@@ -154,7 +154,8 @@ class CustomMiningCompletionServiceTest {
                 worldMutation,
                 dropPort,
                 position -> true,
-                triggerService);
+                triggerService,
+                null);
 
         MiningCompletionPort.CompletionResult result = service.complete(request(TOOL_ID));
 
@@ -179,7 +180,8 @@ class CustomMiningCompletionServiceTest {
                 worldMutation,
                 dropPort,
                 regionSafety,
-                triggerService);
+                triggerService,
+                null);
     }
 
     private static MiningCompletionPort.CompletionRequest request(CustomItemId toolId) {
@@ -225,7 +227,13 @@ class CustomMiningCompletionServiceTest {
     }
 
     private static ItemDef item(String id) {
-        return new ItemDef(new CustomItemId(id), "DIAMOND_PICKAXE", 2001, new ToolAttributes(5.0D, 1.2D, 500));
+        return new ItemDef(
+                new CustomItemId(id),
+                "DIAMOND_PICKAXE",
+                2001,
+                new ToolAttributes(5.0D, 1.2D, 500),
+                Optional.empty(),
+                Optional.empty());
     }
 
     private static final class FakeBlockStore implements BlockStorePort {

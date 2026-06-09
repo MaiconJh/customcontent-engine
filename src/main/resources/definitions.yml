@@ -29,7 +29,7 @@ items:
       speed: 1.0
       durability: 1
 
-  ruby_pickaxe:
+ruby_pickaxe:
     material_base: DIAMOND_PICKAXE
     custom_model_data: 2001
     attributes:
@@ -38,6 +38,10 @@ items:
       durability: 500
     mining:
       speed: 8.0
+    durability:
+      max: 500
+      damage_on_custom_block_break: 1
+      break_when_zero: true
     mechanics:
       on_block_break:
         - area_break

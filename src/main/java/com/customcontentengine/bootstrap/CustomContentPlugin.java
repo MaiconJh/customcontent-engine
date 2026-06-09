@@ -6,7 +6,7 @@ import com.customcontentengine.adapter.bukkit.BlockPlaceAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitDropAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitItemMetadataAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitMiningVisualAdapter;
-import com.customcontentengine.adapter.bukkit.BukkitWorldMutationAdapter;
+import com.customcontentengine.adapter.bukkit.BukkitToolWearAdapter;
 import com.customcontentengine.adapter.bukkit.ItemCommandAdapter;
 import com.customcontentengine.adapter.bukkit.MiningInputAdapter;
 import com.customcontentengine.adapter.bukkit.MiningProcessingDriver;
@@ -69,10 +69,11 @@ public final class CustomContentPlugin extends JavaPlugin {
                 cooldowns,
                 scheduler,
                 regionSafety);
-        AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerService(
+AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerService(
                 registry.mechanicBindings(),
                 AreaBreakMechanic.ID,
                 areaBreakRuntime);
+        BukkitToolWearAdapter toolWear = new BukkitToolWearAdapter(registry, itemMetadata);
         MiningSessionService miningSessionService = new MiningSessionService(
                 new InMemoryMiningSessionRepository(),
                 MiningDurationPolicy.DEFAULT);
@@ -83,7 +84,8 @@ public final class CustomContentPlugin extends JavaPlugin {
                 worldMutation,
                 dropPort,
                 regionSafety,
-                areaBreakEventTrigger);
+                areaBreakEventTrigger,
+                toolWear);
         MiningRuntimeProcessor miningRuntimeProcessor = new MiningRuntimeProcessor(
                 miningSessionService,
                 miningVisual,

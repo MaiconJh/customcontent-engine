@@ -272,11 +272,90 @@ class YamlDefinitionLoaderTest {
                 "blocks.ruby_ore.material_base must be a non-empty string");
     }
 
-    @Test
+@Test
     void keepsSchemaOneWithMiningFields() throws IOException {
         DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMining()).toFile());
 
         assertTrue(registry.findBlock(new CustomBlockId("ruby_ore")).isPresent());
+    }
+
+    @Test
+    void loadsItemDurabilityDefinition() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYamlWithDurability()).toFile());
+
+        var item = registry.findItem(new CustomItemId("ruby_pickaxe")).orElseThrow();
+        assertTrue(item.durability().isPresent());
+        assertEquals(500, item.durability().get().max());
+        assertEquals(1, item.durability().get().damageOnCustomBlockBreak());
+    }
+
+    @Test
+    void itemWithoutDurabilityHasEmptyOptional() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYaml()).toFile());
+
+        var item = registry.findItem(new CustomItemId("ruby_pickaxe")).orElseThrow();
+        assertTrue(item.durability().isEmpty());
+    }
+
+    @Test
+    void rejectsNonPositiveDurabilityMax() throws IOException {
+        assertInvalid(
+                validYamlWithDurability().replace("max: 500", "max: 0"),
+                "items.ruby_pickaxe.durability.max must be greater than zero but was 0");
+    }
+
+    @Test
+    void rejectsNegativeDamageOnCustomBlockBreak() throws IOException {
+        assertInvalid(
+                validYamlWithDurability().replace("damage_on_custom_block_break: 1", "damage_on_custom_block_break: -1"),
+                "items.ruby_pickaxe.durability.damage_on_custom_block_break must not be negative but was -1");
+    }
+
+    @Test
+    void acceptsDefaultBreakWhenZeroTrue() throws IOException {
+        String yaml = validYamlWithDurability().replace("break_when_zero: true", "");
+        DefinitionRegistry registry = loader().load(writeYaml(yaml).toFile());
+
+        var item = registry.findItem(new CustomItemId("ruby_pickaxe")).orElseThrow();
+        assertTrue(item.durability().isPresent());
+        assertEquals(com.customcontentengine.domain.durability.ToolBreakPolicy.BREAK, item.durability().get().breakPolicy());
+    }
+
+    @Test
+    void acceptsBreakWhenZeroFalse() throws IOException {
+        String yaml = validYamlWithDurability().replace("break_when_zero: true", "break_when_zero: false");
+        DefinitionRegistry registry = loader().load(writeYaml(yaml).toFile());
+
+        var item = registry.findItem(new CustomItemId("ruby_pickaxe")).orElseThrow();
+        assertTrue(item.durability().isPresent());
+        assertEquals(com.customcontentengine.domain.durability.ToolBreakPolicy.PRESERVE, item.durability().get().breakPolicy());
+    }
+
+    private String validYamlWithDurability() {
+        return """
+                schema: 1
+                blocks:
+                  ruby_ore:
+                    numeric_id: 1
+                    material_base: NOTE_BLOCK
+                    custom_model_data: 1001
+                    required_tool: ruby_pickaxe
+                    drops:
+                      - item: ruby
+                        amount: 1
+                items:
+                  ruby_pickaxe:
+                    material_base: DIAMOND_PICKAXE
+                    custom_model_data: 2001
+                    attributes:
+                      damage: 5.0
+                      speed: 1.2
+                      durability: 500
+                    durability:
+                      max: 500
+                      damage_on_custom_block_break: 1
+                      break_when_zero: true
+                """;
     }
 
     private void assertInvalid(String yaml, String expectedMessagePart) throws IOException {

@@ -1,6 +1,7 @@
 package com.customcontentengine.port;
 
 import com.customcontentengine.domain.definition.ItemDef;
+import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import java.util.Optional;
 
@@ -10,4 +11,10 @@ public interface ItemMetadataPort<T> {
     T applyCustomItemIdentity(T item, CustomItemId id);
 
     Optional<CustomItemId> readCustomItemIdentity(T item);
+
+    ToolDurability initialDurabilityFor(int max);
+
+    Optional<ToolDurability> readCurrentDurability(T item, int max);
+
+    T writeCurrentDurability(T item, ToolDurability durability);
 }
