@@ -9,6 +9,7 @@ import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
+import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
@@ -102,6 +103,24 @@ class BlockPlaceAdapterTest {
         @Override
         public Optional<CustomItemId> readCustomItemIdentity(ItemStack item) {
             return Optional.of(itemId);
+        }
+
+        @Override
+        public ToolDurability initialDurabilityFor(int max) {
+            // TODO Auto-generated method stub
+            throw new UnsupportedOperationException("Unimplemented method 'initialDurabilityFor'");
+        }
+
+        @Override
+        public Optional<ToolDurability> readCurrentDurability(ItemStack item, int max) {
+            // TODO Auto-generated method stub
+            throw new UnsupportedOperationException("Unimplemented method 'readCurrentDurability'");
+        }
+
+        @Override
+        public ItemStack writeCurrentDurability(ItemStack item, ToolDurability durability) {
+            // TODO Auto-generated method stub
+            throw new UnsupportedOperationException("Unimplemented method 'writeCurrentDurability'");
         }
     }
 
