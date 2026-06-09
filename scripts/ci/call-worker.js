@@ -9,74 +9,65 @@ function arg(name, fallback) {
 
 function fallbackMarkdown(type, payload, reason) {
   const safeReason = sanitizeString(reason || "unknown worker failure").slice(0, 240);
-  if (type === "failure") {
-    return `## CI Failure - build/test failed
+  const failureText = "Worker analysis did not complete within the timeout. Local fallback was used. No full AI review was produced.";
+  const failureHeading = type === "failure" ? "CI Failure - build/test failed" : "AI Technical Note - Worker analysis fallback";
 
-AI analysis fell back to local reporting because Worker analysis did not complete.
-
-### Fallback reason
-
-${safeReason}
-
-### Data
-
-* Repository: ${payload.repository}
+  let dataBullets = `* Repository: ${payload.repository}
 * Branch: ${payload.branch}
 * Commit: ${payload.commit}
 * Workflow: ${payload.workflow}
-* Run URL: ${payload.run_url}
+* Run URL: ${payload.run_url}`;
+  if (type !== "failure") {
+    dataBullets += `
+* GitHub Actions build-test: ${process.env.CI_BUILD_RESULT || "success"}`;
+  }
 
-### Next steps
+  let postData = "";
+  if (type === "failure") {
+    postData = `### Next steps
 
 * Check the GitHub Actions build.log artifact.
 * Fix the build/test failure.
-* Re-run the GitHub Actions workflow.
+* Re-run the GitHub Actions workflow.`;
+  } else {
+    const classification = classifyDiff(payload.diff || "");
+    const categories = formatCategories(classification);
+    const focus = reviewFocus(classification);
+    const risk = fallbackRisk(classification);
+    postData = `### Changed file categories
 
-## AI Governance Review
-
-### Verdict
-Fallback reporting was published because Worker analysis did not return a complete report.
-
-### Publish Decision
-fallback`;
-  }
-  const classification = classifyDiff(payload.diff || "");
-  const categories = formatCategories(classification);
-  const focus = reviewFocus(classification);
-  const risk = fallbackRisk(classification);
-  return `## AI Technical Note - Worker analysis fallback
-
-Worker analysis did not complete, so the workflow published a local fallback report. GitHub Actions build/test remains the source of truth.
-
-### Fallback reason
-
-${safeReason}
-
-### Data
-
-* Repository: ${payload.repository}
-* Branch: ${payload.branch}
-* Commit: ${payload.commit}
-* Workflow: ${payload.workflow}
-* Run URL: ${payload.run_url}
+${categories}
 
 ### Local fallback analysis
-
-Changed file categories: ${categories}.
 
 ${risk}
 
 Review focus:
 
-${focus}
+${focus}`;
+  }
+
+  return `## ${failureHeading}
+
+${failureText}
+
+### Fallback reason
+
+${safeReason}
+
+## Data
+
+${dataBullets}
+
+${postData}
 
 ## AI Governance Review
 
 ### Verdict
-Fallback reporting was published because Worker analysis did not return a complete report.
+Local fallback was used because the Worker analysis did not return a complete report within the timeout.
 
 ### Relevance
-The note is relevant to the pushed commit and remote workflow run, but it is not a full AI review.
+This fallback note is relevant to the pushed commit and workflow run, but it is not a full AI review.
 
 ### Truthfulness Check
 The fallback reason is based on the Worker call result observed by the workflow.
@@ -159,42 +150,59 @@ function normalizePath(file) {
   return String(file || "").replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
-function formatCategories(classification) {
-  const categories = [
-    classification.javaProduction ? "java production code" : "",
-    classification.javaTests ? "java tests/spikes" : "",
-    classification.docs ? "docs" : "",
-    classification.workflows ? "GitHub Actions workflows" : "",
-    classification.ciScripts ? "CI scripts" : "",
-    classification.worker ? "Cloudflare Worker" : "",
-    classification.configResources ? "config/resources" : "",
-    classification.unknown ? "unknown" : "",
-  ].filter(Boolean);
-  return categories.length ? categories.join(", ") : "none detected";
+function fileCategory(file) {
+  const normalized = normalizePath(file);
+  if (normalized === "docs/AI_CONTEXT_PACK.md" || normalized === "docs/PROJECT_SCOPE.md" || normalized === "docs/ARCHITECTURE_GUARDRAILS.md") {
+    return 0;
+  }
+  if (/^docs\/adr\//.test(normalized)) return 1;
+  if (/^docs\/milestones\//.test(normalized)) return 1;
+  if (normalized.startsWith(".github/workflows/")) return 4;
+  if (/^(build\.gradle\.kts|settings\.gradle\.kts|README\.md|src\/main\/resources\/(plugin\.yml|definitions\.yml))$/.test(normalized)) return 3;
+  return 2;
 }
 
-function fallbackRisk(classification) {
-  if (classification.javaProduction && !classification.javaTests) {
-    return "Java production source files changed without a Java test diff in this change; use GitHub Actions to assess regression risk.";
+function shrinkFileContent(file, allowed) {
+  if (!file || typeof file !== "object") return file;
+  if (!file.content || typeof file.content !== "string") return file;
+  const next = { ...file };
+  if (String(next.content).length > allowed) {
+    next.content = `${next.content.slice(0, allowed)}\n[TRUNCATED: project context file exceeded limit]`;
+    next.truncated = true;
   }
-  if (classification.workflows || classification.ciScripts || classification.worker || classification.configResources) {
-    return "Configuration or automation changes were detected. No production-code regression risk is inferred unless production source files changed.";
-  }
-  if (classification.docs && !classification.javaProduction && !classification.javaTests && !classification.workflows && !classification.ciScripts && !classification.worker && !classification.configResources && !classification.unknown) {
-    return "Documentation-only changes were detected. No runtime behavior impact is inferred by local fallback.";
-  }
-  return "No specific production-code risk was inferred by local fallback.";
+  return next;
 }
 
-function reviewFocus(classification) {
-  const focus = [];
-  if (classification.workflows) focus.push("* Workflow permissions, triggers, environment variables, and report paths.");
-  if (classification.ciScripts) focus.push("* CI script output files, fallback reasons, GitHub API calls, and log clarity.");
-  if (classification.worker) focus.push("* Worker deploy status, provider diagnostics, response schema, and fallback behavior.");
-  if (classification.configResources) focus.push("* Configuration/resource metadata and runtime declarations.");
-  if (classification.javaProduction) focus.push("* Java production behavior and corresponding remote validation evidence.");
-  if (classification.docs) focus.push("* Documentation consistency with project scope, guardrails, ADRs, and milestones.");
-  return focus.length ? focus.join("\n") : "* Manually inspect the diff and compare it with repository documentation.";
+function shrinkProjectContext(files, budget) {
+  if (!budget || budget <= 0 || !files.length) return files;
+  if (files.reduce((sum, file) => sum + String(file.content || "").length, 0) <= budget) return files;
+
+  const primary = files.filter((file) => fileCategory(file.path) === 0).slice(0, 2);
+  const primaryBudget = Math.floor(budget * 0.6);
+  let summarized = primary.map((file) => {
+    const maxAllowed = fileCategory(file.path) === 0 ? primaryBudget : Math.floor(primaryBudget * 0.35);
+    return shrinkFileContent(file, Math.min(String(file.content || "").length, maxAllowed));
+  }).filter((file) => file.content && String(file.content).length > 0);
+
+  let remaining = budget;
+  for (const file of summarized) {
+    remaining -= String(file.content || "").length;
+  }
+  if (remaining <= 0) return summarized;
+
+  const fallback = files.filter((file) => !primary.includes(file)).sort((a, b) => fileCategory(a.path) - fileCategory(b.path));
+  const shrunkFallback = [];
+  for (const file of fallback) {
+    const allowed = fileCategory(file.path) >= 3 ? Math.min(3000, remaining) : Math.min(6000, remaining);
+    const next = shrinkFileContent(file, allowed);
+    if (next.content && String(next.content).length > 0) {
+      shrunkFallback.push(next);
+      remaining -= String(next.content || "").length;
+    }
+    if (remaining <= 500) break;
+  }
+
+  return [...summarized, ...shrunkFallback];
 }
 
 async function main() {
@@ -205,9 +213,10 @@ async function main() {
   const contextFile = arg("--context-file", null);
   const ciLogsFile = arg("--ci-logs-file", null);
   const driftFile = arg("--drift-file", null);
+  const singleProviderCall = (process.env.CI_AI_SINGLE_PROVIDER_CALL || "").toLowerCase() === "true";
   const contentField = type === "failure" ? "log" : "diff";
   const content = inputFile && fs.existsSync(inputFile) ? fs.readFileSync(inputFile, "utf8") : "";
-  const projectContext = contextFile && fs.existsSync(contextFile)
+  let projectContext = contextFile && fs.existsSync(contextFile)
     ? JSON.parse(fs.readFileSync(contextFile, "utf8")).files || []
     : [];
   const ciLogs = ciLogsFile && fs.existsSync(ciLogsFile)
@@ -218,6 +227,27 @@ async function main() {
   const aiContextPackDrift = driftFile && fs.existsSync(driftFile)
     ? JSON.parse(fs.readFileSync(driftFile, "utf8"))
     : undefined;
+
+  const maxPayloadChars = Number(process.env.CI_AI_MAX_PAYLOAD_CHARS || "90000");
+  const diffChars = String(content).length;
+  const ciLogsChars = String(ciLogs).length;
+  const totalWithoutContext = 5000 + diffChars + ciLogsChars;
+  let contextBudget = Math.max(5000, maxPayloadChars - totalWithoutContext);
+  if (contextBudget < 5000) {
+    contextBudget = 5000;
+  }
+
+  const contextInfo = { files: projectContext.length, chars: projectContext.reduce((sum, file) => sum + String(file.content || "").length, 0) };
+  projectContext = shrinkProjectContext(projectContext, contextBudget);
+  const totalApproxPayloadChars = totalWithoutContext + projectContext.reduce((sum, file) => sum + String(file.content || "").length, 0);
+  console.log(`Worker diagnostics: diffChars=${diffChars}`);
+  console.log(`Worker diagnostics: ciLogsChars=${ciLogsChars}`);
+  console.log(`Worker diagnostics: projectContextBefore=${JSON.stringify(contextInfo).slice(0, 200)}`);
+  console.log(`Worker diagnostics: projectContextAfter=${JSON.stringify({ files: projectContext.length, chars: projectContext.reduce((sum, file) => sum + String(file.content || "").length, 0) }).slice(0, 200)}`);
+  console.log(`Worker diagnostics: totalApproxPayloadChars=${totalApproxPayloadChars}`);
+  console.log(`Worker diagnostics: maxPayloadChars=${maxPayloadChars}`);
+  console.log(`Worker diagnostics: singleProviderCall=${singleProviderCall}`);
+
   const payload = sanitizeValue({
     type,
     repository: process.env.GITHUB_REPOSITORY || "",
@@ -237,6 +267,7 @@ async function main() {
       actor: process.env.GITHUB_ACTOR || "",
       ref: process.env.GITHUB_REF || "",
       validationSource: "GitHub Actions",
+      singleProviderCall,
     },
   });
 

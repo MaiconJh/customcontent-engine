@@ -312,6 +312,65 @@ Configure Kilo in the Cloudflare Worker, not in GitHub Actions:
 
 - `KILO_API_KEY`: optional Worker secret for authenticated models.
 
+## Timeout and Payload Hardening
+
+### Current limits
+
+The workflow and Worker have the following default ceilings:
+
+- `MAX_CHARS` / `MAX_DIFF_CHARS`: `50000` characters each for project context and diff collection in GitHub Actions.
+- `CI_AI_MAX_PAYLOAD_CHARS`: `90000` characters total estimated payload after collection (diff + CI logs + context). The CI script will shrink or drop lower-priority context when the payload approaches this ceiling.
+- `CI_WORKER_TIMEOUT_MS`: `120000` milliseconds. The workflow aborts the Worker request after this limit to prevent runaway jobs.
+- `MAX_MODEL_INPUT_CHARS`: `50000` characters per prompt inside the Worker.
+- `MAX_BODY_BYTES`: `120000` bytes. The Worker rejects payloads that exceed this size.
+- `KILO_TIMEOUT_MS`: `30000` milliseconds per provider attempt. Each model fallback retry can take up to this timeout.
+
+### Payload size guard
+
+`scripts/ci/call-worker.js` applies a size guard after collecting context:
+
+- It computes an approximate total payload size (diff + CI logs + overhead).
+- If the estimated payload exceeds `CI_AI_MAX_PAYLOAD_CHARS`, it reduces context buckets in order:
+
+  1. Preserve `docs/AI_CONTEXT_PACK.md` and `docs/PROJECT_SCOPE.md`.
+  2. Preserve `docs/ARCHITECTURE_GUARDRAILS.md` when budget allows.
+  3. Summarize or drop changed ADRs and milestones.
+  4. Drop or truncate workflow/config files first.
+  5. Truncate remaining supporting files to `3000` characters.
+
+### Context priority
+
+`scripts/ci/collect-project-context.js` already lists the same candidate files, and it now prioritizes collection order and per-file budgets:
+
+1. `docs/AI_CONTEXT_PACK.md` (up to 60 percent of context budget when the total payload is tight)
+2. `docs/PROJECT_SCOPE.md` (summary)
+3. `docs/ARCHITECTURE_GUARDRAILS.md` (summary)
+4. Changed ADRs and milestones (aggressive truncation to `5000` characters)
+5. Workflow and configuration files (`3000` characters)
+
+Changed ADR/milestone files are dropped entirely once the context budget falls below `5000` characters.
+
+### Single provider call mode
+
+Set `CI_AI_SINGLE_PROVIDER_CALL=true` in the Worker environment to skip the second Kilo governance round-trip. When enabled:
+
+- The Worker still produces the initial AI report.
+- It uses local governance instead of calling Kilo again.
+- This reduces the chance of Worker/total workflow timeouts because only one provider call is made.
+
+### Granular fallback reasons
+
+The Worker now records precise failure reasons instead of a generic fallback:
+
+- `provider timeout`
+- `provider invalid JSON`
+- `provider empty response`
+- `provider missing content`
+- `worker network timeout`
+- `worker HTTP <status>`
+
+`call-worker.js` emits safe diagnostics only: `diffChars`, `ciLogsChars`, `projectContextBefore`, `projectContextAfter`, `totalApproxPayloadChars`, `maxPayloadChars`, `profile`, `commit`, `endpointPath`, `timeoutMs`, `singleProviderCall`, `httpStatus`, `jsonParsed`, `responseKeys`, `hasFinalReport`, `fallbackUsed`, `fallbackReason`. Full payloads, tokens, and secrets are never logged.
+
 ## Deploy The Worker
 
 ```bash
