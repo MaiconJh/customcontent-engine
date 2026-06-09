@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.customcontentengine.application.block.BlockService;
 import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
+import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
@@ -137,7 +138,7 @@ class BlockBreakAdapterTest {
     }
 
     private static ItemDef item(String id) {
-        return new ItemDef(new CustomItemId(id), "NOTE_BLOCK", 1001, new ToolAttributes(0.0, 1.0, 1));
+        return new ItemDef(new CustomItemId(id), "NOTE_BLOCK", 1001, new ToolAttributes(0.0, 1.0, 1), Optional.empty(), Optional.empty());
     }
 
     private static final class CapturingBlockStore implements BlockStorePort {
@@ -202,6 +203,21 @@ class BlockBreakAdapterTest {
         @Override
         public Optional<CustomItemId> readCustomItemIdentity(ItemStack item) {
             return itemId;
+        }
+
+        @Override
+        public ToolDurability initialDurabilityFor(int max) {
+            return new ToolDurability(max, max);
+        }
+
+        @Override
+        public Optional<ToolDurability> readCurrentDurability(ItemStack item, int max) {
+            return Optional.of(new ToolDurability(max, max));
+        }
+
+        @Override
+        public ItemStack writeCurrentDurability(ItemStack item, ToolDurability durability) {
+            return item;
         }
     }
 }

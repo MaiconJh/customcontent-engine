@@ -29,7 +29,7 @@ items:
       speed: 1.0
       durability: 1
 
-ruby_pickaxe:
+  ruby_pickaxe:
     material_base: DIAMOND_PICKAXE
     custom_model_data: 2001
     attributes:

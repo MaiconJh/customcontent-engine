@@ -10,6 +10,7 @@ import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
 import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.internalapi.identity.CustomItemId;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -47,7 +48,9 @@ class BukkitItemMetadataAdapterTest {
                 new CustomItemId("ruby_pickaxe"),
                 "DIAMOND_PICKAXE",
                 2001,
-                new ToolAttributes(5.0, 1.2, 500));
+                new ToolAttributes(5.0, 1.2, 500),
+                Optional.empty(),
+                Optional.empty());
 
         ItemStack created = adapter.createCustomItem(definition);
 
@@ -65,7 +68,7 @@ class BukkitItemMetadataAdapterTest {
         when(item.getItemMeta()).thenReturn(meta);
         when(meta.getPersistentDataContainer()).thenReturn(container);
         when(container.get(ID_KEY, PersistentDataType.STRING)).thenReturn("ruby_pickaxe");
-        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item);
+        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item, m -> true);
 
         assertEquals(new CustomItemId("ruby_pickaxe"), adapter.readCustomItemIdentity(item).orElseThrow());
     }
@@ -79,7 +82,7 @@ class BukkitItemMetadataAdapterTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Consumer<ItemMeta>> editorCaptor = ArgumentCaptor.forClass(Consumer.class);
         when(item.editMeta(editorCaptor.capture())).thenReturn(true);
-        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item);
+        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item, m -> true);
 
         adapter.applyCustomItemIdentity(item, new CustomItemId("ruby_pickaxe"));
         editorCaptor.getValue().accept(meta);
@@ -96,10 +99,10 @@ class BukkitItemMetadataAdapterTest {
         when(meta.getPersistentDataContainer()).thenReturn(container);
         when(item.hasItemMeta()).thenReturn(true);
         when(item.getItemMeta()).thenReturn(meta);
-        when(item.editMeta(org.mockito.ArgumentMatchers.<Consumer<ItemMeta>>any())).thenReturn(true);
+        when(item.editMeta(org.mockito.ArgumentMatchers.<Consumer<ItemMeta>>any())).thenAnswer(invocation -> { Consumer<ItemMeta> editor = invocation.getArgument(0); editor.accept(meta); return true; });
         when(container.get(DURABILITY_KEY, PersistentDataType.INTEGER)).thenReturn(495);
 
-        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item);
+        BukkitItemMetadataAdapter adapter = new BukkitItemMetadataAdapter(ID_KEY, DURABILITY_KEY, material -> item, m -> true);
 
         ToolDurability written = adapter.initialDurabilityFor(500);
         assertEquals(500, written.max());

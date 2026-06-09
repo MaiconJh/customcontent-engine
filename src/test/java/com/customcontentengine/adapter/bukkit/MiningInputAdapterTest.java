@@ -14,6 +14,7 @@ import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
+import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.domain.mining.MiningDurationPolicy;
 import com.customcontentengine.domain.mining.MiningHardness;
 import com.customcontentengine.domain.mining.MiningSpeed;
@@ -235,7 +236,8 @@ class MiningInputAdapterTest {
                 "DIAMOND_PICKAXE",
                 2001,
                 new ToolAttributes(5.0D, 1.2D, 500),
-                miningSpeed);
+                miningSpeed,
+                Optional.empty());
     }
 
     private static BlockDamageEvent blockDamageEventAt(WorldPosition position) {
@@ -334,6 +336,21 @@ class MiningInputAdapterTest {
         @Override
         public Optional<CustomItemId> readCustomItemIdentity(ItemStack item) {
             return itemId;
+        }
+
+        @Override
+        public Optional<ToolDurability> readCurrentDurability(ItemStack item, int max) {
+            return Optional.empty();
+        }
+
+        @Override
+        public ItemStack writeCurrentDurability(ItemStack item, ToolDurability durability) {
+            return item;
+        }
+
+        @Override
+        public ToolDurability initialDurabilityFor(int max) {
+            return new ToolDurability(max, max);
         }
     }
 

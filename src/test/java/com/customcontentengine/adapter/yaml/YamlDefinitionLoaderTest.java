@@ -242,7 +242,7 @@ class YamlDefinitionLoaderTest {
                 "items.ruby_pickaxe.mechanics must be a YAML section");
     }
 
-    @Test
+@Test
     void rejectsMechanicTriggerValueThatIsNotAList() throws IOException {
         assertInvalid(
                 validYamlWithMechanics().replace("""
@@ -272,7 +272,7 @@ class YamlDefinitionLoaderTest {
                 "blocks.ruby_ore.material_base must be a non-empty string");
     }
 
-@Test
+    @Test
     void keepsSchemaOneWithMiningFields() throws IOException {
         DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMining()).toFile());
 

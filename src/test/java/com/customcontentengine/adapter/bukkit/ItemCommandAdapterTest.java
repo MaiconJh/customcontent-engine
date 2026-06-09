@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.customcontentengine.application.item.ItemService;
+import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.port.ItemMetadataPort;
 import java.util.List;
@@ -52,6 +53,21 @@ class ItemCommandAdapterTest {
         @Override
         public Optional<com.customcontentengine.internalapi.identity.CustomItemId> readCustomItemIdentity(ItemStack item) {
             return Optional.empty();
+        }
+
+        @Override
+        public ToolDurability initialDurabilityFor(int max) {
+            return new ToolDurability(max, max);
+        }
+
+        @Override
+        public Optional<ToolDurability> readCurrentDurability(ItemStack item, int max) {
+            return Optional.of(new ToolDurability(max, max));
+        }
+
+        @Override
+        public ItemStack writeCurrentDurability(ItemStack item, ToolDurability durability) {
+            return item;
         }
     }
 }

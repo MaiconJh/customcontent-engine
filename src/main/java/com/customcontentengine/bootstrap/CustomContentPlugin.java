@@ -7,6 +7,7 @@ import com.customcontentengine.adapter.bukkit.BukkitDropAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitItemMetadataAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitMiningVisualAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitToolWearAdapter;
+import com.customcontentengine.adapter.bukkit.BukkitWorldMutationAdapter;
 import com.customcontentengine.adapter.bukkit.ItemCommandAdapter;
 import com.customcontentengine.adapter.bukkit.MiningInputAdapter;
 import com.customcontentengine.adapter.bukkit.MiningProcessingDriver;
@@ -131,3 +132,4 @@ AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerSe
         }
     }
 }
+

@@ -22,7 +22,7 @@ class ToolDurabilityDefinitionTest {
     void acceptsValidDefinition() {
         ToolDurabilityDefinition def = new ToolDurabilityDefinition(500, 1, ToolBreakPolicy.BREAK);
         assertEquals(500, def.max());
-        assertEquals(1, def.damageOnCustomBlockBreak);
+        assertEquals(1, def.damageOnCustomBlockBreak());
         assertEquals(ToolBreakPolicy.BREAK, def.breakPolicy());
     }
 

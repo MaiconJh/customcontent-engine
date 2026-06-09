@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.customcontentengine.domain.definition.ItemDef;
+import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.domain.definition.ToolAttributes;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomItemId;
@@ -37,7 +38,7 @@ class ItemServiceTest {
     }
 
     private ItemDef item(String id) {
-        return new ItemDef(new CustomItemId(id), "DIAMOND_PICKAXE", 2001, new ToolAttributes(5.0, 1.2, 500));
+        return new ItemDef(new CustomItemId(id), "DIAMOND_PICKAXE", 2001, new ToolAttributes(5.0, 1.2, 500), Optional.empty(), Optional.empty());
     }
 
     private static final class FakeItemMetadataPort implements ItemMetadataPort<String> {
@@ -57,6 +58,21 @@ class ItemServiceTest {
         @Override
         public Optional<CustomItemId> readCustomItemIdentity(String item) {
             return Optional.empty();
+        }
+
+        @Override
+        public ToolDurability initialDurabilityFor(int max) {
+            return new ToolDurability(max, max);
+        }
+
+        @Override
+        public Optional<ToolDurability> readCurrentDurability(String item, int max) {
+            return Optional.of(new ToolDurability(max, max));
+        }
+
+        @Override
+        public String writeCurrentDurability(String item, ToolDurability durability) {
+            return item;
         }
     }
 }
