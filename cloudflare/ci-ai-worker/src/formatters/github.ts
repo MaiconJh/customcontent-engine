@@ -1,9 +1,11 @@
 import type { AnalyzePayload, Finding, GovernanceReview } from "../types";
 import { sanitizeText } from "../sanitizer";
+import { normalizeProviderMarkdown } from "../provider-output";
 
 export function formatGithubMarkdown(payload: AnalyzePayload, markdown: string, fallback = false, fallbackReason = "provider unavailable", governance?: GovernanceReview): string {
   const heading = payload.type === "failure" ? "## CI Failure - build/test failed" : diffHeading(payload.event);
-  const clean = sanitizeText(markdown, 10000).replace(/```[\s\S]{2500,}?```/g, (block) => `${block.slice(0, 2500)}\n[TRUNCATED]\n\`\`\``);
+  const normalized = normalizeProviderMarkdown(markdown, payload.type === "failure" ? "failure" : "diff", 10000);
+  const clean = sanitizeText(normalized, 10000).replace(/```[\s\S]{2500,}?```/g, (block) => `${block.slice(0, 2500)}\n[TRUNCATED]\n\`\`\``);
   const body = clean.trim().startsWith("##") ? clean.trim() : `${heading}\n\n${clean.trim()}`;
   return `${body}
 

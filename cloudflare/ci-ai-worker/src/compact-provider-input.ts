@@ -79,7 +79,7 @@ Audit only this report. Do not invent new findings. Return Markdown with exactly
 ### Recommended Issue Body
 
 Allowed publish decisions: publish, publish_with_caution, amend, suppress, fallback.`, compactProviderLimit(env, "governance"));
-  return compactResult("governance", `You are a governance reviewer. Audit the previous AI report using only compact evidence. Prefer conservative wording.`, user, compactProviderLimit(env, "governance"), context);
+  return compactResult("governance", `You are a governance reviewer. Audit the previous AI report using only compact evidence. Prefer conservative wording. Do not include hidden reasoning, chain-of-thought, scratchpad, or phrases such as "Let me analyze".`, user, compactProviderLimit(env, "governance"), context);
 }
 
 export function buildCompactIssuePlanInput(payload: IssuePlanLikePayload, env: Env, safetyNotes: string[]): CompactProviderInput {
@@ -123,7 +123,7 @@ Scope guardrails:
 - Do not invent exact files unless the issue or documentation clearly supports them.
 - Validation must only mention remote GitHub Actions build/test/integrationTest and CI AI Governance Bot.
 - State clearly that the plan is advisory and requires maintainer review.`, compactProviderLimit(env, "issue-plan"));
-  return compactResult("issue-plan", `You are an issue-driven AI planning assistant for CustomContent Engine. Produce advisory planning only. Do not edit code, commit, open PRs, auto-merge, or recommend local Gradle validation. Use English only.`, user, compactProviderLimit(env, "issue-plan"), context);
+  return compactResult("issue-plan", `You are an issue-driven AI planning assistant for CustomContent Engine. Produce advisory planning only. Do not edit code, commit, open PRs, auto-merge, or recommend local Gradle validation. Do not include hidden reasoning, chain-of-thought, scratchpad, or phrases such as "Let me analyze". Use English only.`, user, compactProviderLimit(env, "issue-plan"), context);
 }
 
 export function buildCompactImplementIssueInput(payload: ImplementIssueLikePayload, env: Env): CompactProviderInput {
@@ -186,7 +186,7 @@ Return exactly this JSON shape:
   "safetyNotes": ["..."],
   "validationNotes": ["GitHub Actions build/test/integrationTest", "CI AI Governance Bot"]
 }`, compactProviderLimit(env, "implement-issue"));
-  return compactResult("implement-issue", `You are a controlled AI implementation proposer for CustomContent Engine. Return JSON only. Propose only small, safe fileEdits directly traceable to the approved issue plan. If no safe implementation is obvious, return an empty fileEdits array.`, user, compactProviderLimit(env, "implement-issue"), context);
+  return compactResult("implement-issue", `You are a controlled AI implementation proposer for CustomContent Engine. Return JSON only. Propose only small, safe fileEdits directly traceable to the approved issue plan. If no safe implementation is obvious, return an empty fileEdits array. Do not include hidden reasoning, chain-of-thought, scratchpad, or phrases such as "Let me analyze".`, user, compactProviderLimit(env, "implement-issue"), context);
 }
 
 function buildCompactDiffInput(payload: Extract<AnalyzePayload, { type: "diff" }>, env: Env): CompactProviderInput {

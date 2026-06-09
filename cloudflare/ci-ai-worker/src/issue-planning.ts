@@ -1,6 +1,7 @@
 import type { AiContextPackDrift, Env, ProjectContextFile } from "./types";
 import { buildCompactIssuePlanInput } from "./compact-provider-input";
 import { callKiloChatCompletion } from "./providers/kilo";
+import { normalizeProviderMarkdown } from "./provider-output";
 import { sanitizeText } from "./sanitizer";
 
 const REQUIRED_SECTIONS = [
@@ -113,15 +114,18 @@ export async function planIssue(payload: IssuePlanPayload, env: Env): Promise<Is
   }
   const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
 
-  if (!provider.ok || !provider.text) {
-    return localIssuePlan(payload, provider.error || "empty response", safetyNotes);
+  const providerPlan = provider.ok && provider.text
+    ? normalizeProviderMarkdown(provider.text, "issue-plan", 24000)
+    : "";
+  if (!provider.ok || !providerPlan) {
+    return localIssuePlan(payload, !provider.ok ? provider.error || "empty response" : "provider plan output empty after normalization", safetyNotes);
   }
 
-  if (hasUnsafeProviderPlan(provider.text)) {
+  if (hasUnsafeProviderPlan(providerPlan)) {
     return localIssuePlan(payload, "provider plan failed planning safety checks", safetyNotes);
   }
 
-  const plan = normalizePlan(provider.text, payload, safetyNotes);
+  const plan = normalizePlan(providerPlan, payload, safetyNotes);
   if (!hasRequiredSections(plan)) {
     return localIssuePlan(payload, "provider plan did not include the required planning sections", safetyNotes);
   }

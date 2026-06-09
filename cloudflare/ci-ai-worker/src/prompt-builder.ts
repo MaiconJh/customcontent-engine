@@ -12,6 +12,7 @@ Do not repeat full logs.
 Do not generate overly long responses.
 If there is uncertainty, state it explicitly.
 Return clear, concise, actionable Markdown in English.
+Do not include hidden reasoning, chain-of-thought, scratchpad, or phrases such as "Let me analyze".
 Prefer small, functional snippets.
 Do not generate dangerous code.
 Do not recommend disabling tests to fix failures.

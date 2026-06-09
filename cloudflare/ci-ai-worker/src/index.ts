@@ -3,6 +3,7 @@ import { buildCompactAnalyzeInput, buildCompactGovernanceInput } from "./compact
 import { checkRateLimit } from "./rate-limit";
 import { callKiloChatCompletion } from "./providers/kilo";
 import { formatGithubMarkdown, normalizeFindings } from "./formatters/github";
+import { normalizeProviderMarkdown } from "./provider-output";
 import { proposeIssueImplementation, type ImplementIssuePayload } from "./issue-implementation";
 import { planIssue, type IssuePlanPayload } from "./issue-planning";
 import { errorResponse, okResponse } from "./response-schema";
@@ -69,12 +70,17 @@ export async function analyze(payload: AnalyzePayload, env: Env) {
   } else {
     console.warn(`AI provider skipped: endpoint=${prompt.endpoint} providerInputChars=${prompt.chars} providerInputLimit=${prompt.limit} fallbackReason=${provider.error}`);
   }
-  const initialFallback = !provider.ok || !provider.text;
-  let fallbackReason = initialFallback ? provider.error || "empty response" : undefined;
+  const providerReport = provider.ok && provider.text
+    ? normalizeProviderMarkdown(provider.text, payload.type === "failure" ? "failure" : "diff")
+    : "";
+  const initialFallback = !provider.ok || !providerReport;
+  let fallbackReason = initialFallback
+    ? (!provider.ok ? provider.error || "empty response" : "provider output empty after normalization")
+    : undefined;
   if (initialFallback) {
-    console.warn(`AI provider fallback used: ${provider.error || "empty response"}`);
+    console.warn(`AI provider fallback used: ${fallbackReason}`);
   }
-  const initialReport = initialFallback ? localFallback(payload) : provider.text || "";
+  const initialReport = initialFallback ? localFallback(payload) : providerReport;
   const metadata = (payload as { metadata?: Record<string, unknown> }).metadata;
   const singleProviderCall = isMainPush(payload)
     || String(metadataValue(metadata, "singleProviderCall") || "").toLowerCase() === "true"
@@ -117,10 +123,13 @@ export async function governanceReview(payload: GovernancePayload, env: Env): Pr
     return localGovernance(payload, `compact provider input exceeded ${prompt.endpoint} limit`);
   }
   const provider = await callKiloChatCompletion(env, prompt.system, prompt.user);
-  if (!provider.ok || !provider.text) {
-    return localGovernance(payload, provider.error || "empty response");
+  const governanceText = provider.ok && provider.text
+    ? normalizeProviderMarkdown(provider.text, "governance")
+    : "";
+  if (!provider.ok || !governanceText) {
+    return localGovernance(payload, !provider.ok ? provider.error || "empty response" : "provider governance output empty after normalization");
   }
-  return parseGovernanceMarkdown(provider.text);
+  return parseGovernanceMarkdown(governanceText);
 }
 
 export function localFallback(payload: AnalyzePayload): string {
