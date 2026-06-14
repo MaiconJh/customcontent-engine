@@ -123,14 +123,22 @@ private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
         if (!section.contains("mining")) {
             return Optional.empty();
         }
-        return Optional.of(new ToolTier(section.getConfigurationSection("mining").getInt("tier")));
+        ConfigurationSection mining = section.getConfigurationSection("mining");
+        if (mining == null || !mining.contains("tier")) {
+            return Optional.empty();
+        }
+        return Optional.of(new ToolTier(mining.getInt("tier")));
     }
 
     private Optional<BlockTierRequirement> loadMiningRequiredTier(ConfigurationSection section) {
         if (!section.contains("mining")) {
             return Optional.empty();
         }
-        return Optional.of(new BlockTierRequirement(section.getConfigurationSection("mining").getInt("required_tier")));
+        ConfigurationSection mining = section.getConfigurationSection("mining");
+        if (mining == null || !mining.contains("required_tier")) {
+            return Optional.empty();
+        }
+        return Optional.of(new BlockTierRequirement(mining.getInt("required_tier")));
     }
 
     private Optional<ToolDurabilityDefinition> loadDurability(ConfigurationSection section) {

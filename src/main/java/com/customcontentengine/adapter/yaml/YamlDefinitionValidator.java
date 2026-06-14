@@ -63,11 +63,13 @@ public final class YamlDefinitionValidator {
         requireSectionInstance(section, "items." + id);
         requireNonBlankString(section, "items." + id + ".material_base", "material_base");
         requirePositiveInt(section, "items." + id + ".custom_model_data", "custom_model_data");
-        ConfigurationSection attributes = requireSection(section, "items." + id + ".attributes", "attributes");
-        requireNumber(attributes, "items." + id + ".attributes.damage", "damage");
-        requireNumber(attributes, "items." + id + ".attributes.speed", "speed");
-        requirePositiveInt(attributes, "items." + id + ".attributes.durability", "durability");
- if (section.contains("mining")) {
+        if (section.contains("attributes")) {
+            ConfigurationSection attributes = requireSection(section, "items." + id + ".attributes", "attributes");
+            requireNumber(attributes, "items." + id + ".attributes.damage", "damage");
+            requireNumber(attributes, "items." + id + ".attributes.speed", "speed");
+            requirePositiveInt(attributes, "items." + id + ".attributes.durability", "durability");
+        }
+        if (section.contains("mining")) {
             ConfigurationSection mining = requireSection(section, "items." + id + ".mining", "mining");
             requireNumber(mining, "items." + id + ".mining.speed", "speed");
             double speed = mining.getDouble("speed");
