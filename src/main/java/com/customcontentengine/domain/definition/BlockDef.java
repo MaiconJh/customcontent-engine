@@ -1,5 +1,6 @@
 package com.customcontentengine.domain.definition;
 
+import com.customcontentengine.domain.mining.BlockTierRequirement;
 import com.customcontentengine.domain.mining.MiningHardness;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import java.util.Objects;
@@ -12,7 +13,8 @@ public record BlockDef(
         int customModelData,
         String requiredTool,
         DropTable drops,
-        Optional<MiningHardness> miningHardness
+        Optional<MiningHardness> miningHardness,
+        Optional<BlockTierRequirement> miningRequiredTier
 ) {
     public BlockDef(
             CustomBlockId id,
@@ -21,7 +23,7 @@ public record BlockDef(
             int customModelData,
             String requiredTool,
             DropTable drops) {
-        this(id, numericId, materialBase, customModelData, requiredTool, drops, Optional.empty());
+        this(id, numericId, materialBase, customModelData, requiredTool, drops, Optional.empty(), Optional.empty());
     }
 
     public BlockDef {
@@ -40,5 +42,6 @@ public record BlockDef(
         }
         drops = Objects.requireNonNull(drops, "drops");
         miningHardness = Objects.requireNonNull(miningHardness, "miningHardness");
+        miningRequiredTier = Objects.requireNonNull(miningRequiredTier, "miningRequiredTier");
     }
 }

@@ -233,6 +233,7 @@ class CustomMiningCompletionServiceTest {
                 2001,
                 new ToolAttributes(5.0D, 1.2D, 500),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 

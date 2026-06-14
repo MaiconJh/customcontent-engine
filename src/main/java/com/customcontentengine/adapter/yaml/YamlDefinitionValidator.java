@@ -40,6 +40,9 @@ public final class YamlDefinitionValidator {
             if (hardness <= 0.0D) {
                 throw error("blocks." + id + ".mining.hardness must be greater than zero but was " + hardness);
             }
+            if (mining.contains("required_tier")) {
+                requirePositiveInt(mining, "blocks." + id + ".mining.required_tier", "required_tier");
+            }
         }
     }
 
@@ -64,12 +67,15 @@ public final class YamlDefinitionValidator {
         requireNumber(attributes, "items." + id + ".attributes.damage", "damage");
         requireNumber(attributes, "items." + id + ".attributes.speed", "speed");
         requirePositiveInt(attributes, "items." + id + ".attributes.durability", "durability");
-if (section.contains("mining")) {
+ if (section.contains("mining")) {
             ConfigurationSection mining = requireSection(section, "items." + id + ".mining", "mining");
             requireNumber(mining, "items." + id + ".mining.speed", "speed");
             double speed = mining.getDouble("speed");
             if (speed <= 0.0D) {
                 throw error("items." + id + ".mining.speed must be greater than zero but was " + speed);
+            }
+            if (mining.contains("tier")) {
+                requirePositiveInt(mining, "items." + id + ".mining.tier", "tier");
             }
         }
         if (section.contains("durability")) {

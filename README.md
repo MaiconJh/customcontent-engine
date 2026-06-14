@@ -1,6 +1,6 @@
 # CustomContent Engine
 
-CustomContent Engine is a Paper 1.21+ engine for custom blocks, tools, and items, built with a pure domain core, hexagonal architecture, binary PDC persistence, YAML mechanic bindings, controlled mechanic execution, and an engine-controlled custom mining model.
+CustomContent Engine is a Paper 1.21+ engine for custom blocks, tools, and items, built with a pure domain core, hexagonal architecture, binary PDC persistence, YAML mechanic bindings, controlled mechanic execution, an engine-controlled custom mining model, and custom tool durability.
 
 The project follows a conservative-but-evolvable core model: the core stays small and protected from feature inflation, while new ideas can evolve through ADRs, spikes, experimental modules, official modules, and fitness functions.
 
@@ -10,6 +10,7 @@ The project follows a conservative-but-evolvable core model: the core stays smal
 - MVP-1: Complete for the controlled `area_break` scope.
 - MVP-2: Complete for the custom mining scope.
 - MVP-3: Complete for custom tool durability and wear.
+- MVP-4: Experimental mining tiers and effective-block behavior (optional YAML fields, tier-gated mining sessions).
 - Folia: architectural goal; advanced cross-region behavior is not promised as final support yet.
 - Public API: not stable and not available yet.
 
@@ -43,7 +44,7 @@ The project follows a conservative-but-evolvable core model: the core stays smal
 - Cooldown and work-budget gates.
 - Same-region-safe behavior for the controlled MVP-1 scope.
 
-### Post-MVP-1 / MVP-2 Additions
+### Post-MVP-1 / MVP-2 / MVP-3 Additions
 
 - YAML mechanic bindings through `items.<id>.mechanics.on_block_break`.
 - Removal of the hidden `ruby_pickaxe -> area_break` policy.
@@ -60,6 +61,11 @@ The project follows a conservative-but-evolvable core model: the core stays smal
 - Completion removes custom block identity once, sets the block to `AIR` once, emits configured drops once, and triggers `mechanics.on_block_break` once.
 - No fake `BlockBreakEvent` simulation.
 - No `Bukkit#callEvent` for fake block breaking.
+- Custom tool durability and wear through `items.<id>.durability`.
+- Durability stored in PDC and initialized when custom tools are created.
+- Wear applied once per successful custom mining completion.
+- `break_when_zero` policy controls whether zero-durability tools are removed or preserved.
+- `area_break` does not multiply durability damage; one completion applies one wear event.
 
 ## Architecture
 
@@ -274,6 +280,56 @@ Durability behavior:
 
 MVP-3 Limitation: Tool durability wear is applied once per custom mining completion, regardless of how many blocks are broken by AreaBreak. Additional blocks broken by `area_break` do not multiply the durability damage.
 
+## Mining Tiers (Experimental)
+
+Mining tiers add optional progression gating to custom mining without changing hardness, speed, or durability.
+
+### YAML Fields
+
+```yaml
+blocks:
+  ruby_ore:
+    material_base: STONE
+    numeric_id: 1
+    custom_model_data: 1000
+    mining:
+      hardness: 6.0
+      required_tier: 2     # optional, positive integer
+
+items:
+  ruby_pickaxe:
+    material_base: DIAMOND_PICKAXE
+    custom_model_data: 1001
+    mining:
+      speed: 8.0
+      tier: 3               # optional, positive integer
+```
+
+### Rules
+
+- `items.<id>.mining.tier` — optional positive integer. Absent means the tool does not participate in tier checks.
+- `blocks.<id>.mining.required_tier` — optional positive integer. Absent means the block accepts any tool.
+- A tool without a declared `tier` cannot satisfy any block `required_tier`.
+- A block without `required_tier` accepts any tool, including tools without a tier.
+- Tier logic is independent of `mining.speed`, durability, and `area_break`.
+- Tier validation occurs when a mining session would start. If the active tool's tier is below the target block's required tier, no session is created and the player receives a chat message.
+- If the held item changes during an active mining session, the existing held-item change cancellation path invalidates the session.
+- `schema: 1` is preserved; no migration is required because the fields are purely additive and optional.
+
+### Architecture
+
+- `ToolTier` and `BlockTierRequirement` are pure domain value objects in `domain.mining`.
+- `ItemDef` and `BlockDef` carry optional tier fields.
+- Validation occurs in the adapter before `MiningSessionService.startSession` is called.
+- Player-facing feedback is owned by the adapter layer.
+- No new core capability, scheduler contract, or public API is introduced.
+
+### Known Limitations
+
+- Tiers are experimental and may change.
+- Tiers are purely a mining eligibility check; they do not modify mining speed, durability wear, or `area_break` behavior.
+- There is no tool upgrade, enchantment, or GUI integration for tiers.
+
 ## Current Limitations
 
 - No second mechanic beyond `area_break`.
@@ -282,7 +338,6 @@ MVP-3 Limitation: Tool durability wear is applied once per custom mining complet
 - No `auto_smelt`.
 - No Fortune or Silk Touch.
 - No Efficiency enchantment support.
-- No advanced tool tiers.
 - No multiple-player shared mining of the same block in the current scope.
 - No repair system for custom tool durability (mending, crafting, anvil).
 - No complex permission system.
@@ -381,6 +436,7 @@ rg 'Bukkit#callEvent|callEvent\(|BlockBreakEvent' src/main/java/com/customconten
 
 ## Important Documentation
 
+- `docs/AI_CONTEXT_PACK.md`
 - `docs/PROJECT_SCOPE.md`
 - `docs/ARCHITECTURE_GUARDRAILS.md`
 - `docs/adr/`
@@ -401,20 +457,19 @@ Important ADRs:
 - ADR 0007 — Architecture Fitness Functions.
 - ADR 0008 — YAML Mechanic Bindings.
 - ADR 0009 — Custom Mining Model.
+- ADR 0010 — Tool Tiers and Effective Blocks.
 
 ## Next Phase
 
-Recommended post-MVP-2 work:
+Recommended post-MVP-3 work:
 
-- Update post-MVP roadmap.
-- Implement Architecture Fitness Functions / ArchUnit checks if not already active.
-- Harden YAML mechanic binding validation and diagnostics.
+- Finalize the documentation freeze for the completed MVP scope.
+- Harden MVP-3 durability, mining, and `area_break` integration tests.
 - Refine Folia ownership validation and document advanced cross-region behavior.
 - Define devtools policy, including future treatment of `/debugareabreak`.
-- Evaluate durability and wear only through ADR/spike-backed planning.
 - Evaluate a second mechanic only through the incubation process.
 
-Any expansion after MVP-2 must follow the project scope, architecture guardrails, accepted ADRs, and the incubation or ADR process required for new contracts, scheduler changes, YAML schema changes, persistence changes, extension points, mining behavior changes, or additional mechanics.
+Any expansion after MVP-3 must follow the project scope, architecture guardrails, accepted ADRs, and the incubation or ADR process required for new contracts, scheduler changes, YAML schema changes, persistence changes, extension points, mining behavior changes, durability behavior changes, or additional mechanics.
 
 ## License
 

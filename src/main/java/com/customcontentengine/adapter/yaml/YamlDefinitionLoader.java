@@ -9,8 +9,10 @@ import com.customcontentengine.domain.durability.ToolDurabilityDefinition;
 import com.customcontentengine.domain.mechanic.MechanicBinding;
 import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
 import com.customcontentengine.domain.mechanic.MechanicTrigger;
+import com.customcontentengine.domain.mining.BlockTierRequirement;
 import com.customcontentengine.domain.mining.MiningHardness;
 import com.customcontentengine.domain.mining.MiningSpeed;
+import com.customcontentengine.domain.mining.ToolTier;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
@@ -61,7 +63,8 @@ public final class YamlDefinitionLoader {
                     section.getInt("custom_model_data"),
                     section.getString("required_tool"),
                     new DropTable(loadDrops(id, section.getMapList("drops"))),
-                    loadMiningHardness(section)
+                    loadMiningHardness(section),
+                    loadMiningRequiredTier(section)
             ));
         }
         return blocks;
@@ -95,6 +98,7 @@ private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
                             attributes.getInt("durability")
                     ),
                     loadMiningSpeed(section),
+                    loadMiningToolTier(section),
                     loadDurability(section)
             ));
         }
@@ -108,11 +112,25 @@ private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
         return Optional.of(new MiningHardness(section.getConfigurationSection("mining").getDouble("hardness")));
     }
 
-private Optional<MiningSpeed> loadMiningSpeed(ConfigurationSection section) {
+    private Optional<MiningSpeed> loadMiningSpeed(ConfigurationSection section) {
         if (!section.contains("mining")) {
             return Optional.empty();
         }
         return Optional.of(new MiningSpeed(section.getConfigurationSection("mining").getDouble("speed")));
+    }
+
+    private Optional<ToolTier> loadMiningToolTier(ConfigurationSection section) {
+        if (!section.contains("mining")) {
+            return Optional.empty();
+        }
+        return Optional.of(new ToolTier(section.getConfigurationSection("mining").getInt("tier")));
+    }
+
+    private Optional<BlockTierRequirement> loadMiningRequiredTier(ConfigurationSection section) {
+        if (!section.contains("mining")) {
+            return Optional.empty();
+        }
+        return Optional.of(new BlockTierRequirement(section.getConfigurationSection("mining").getInt("required_tier")));
     }
 
     private Optional<ToolDurabilityDefinition> loadDurability(ConfigurationSection section) {

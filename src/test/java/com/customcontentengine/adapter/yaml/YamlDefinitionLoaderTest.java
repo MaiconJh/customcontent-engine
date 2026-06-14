@@ -331,6 +331,109 @@ class YamlDefinitionLoaderTest {
         assertEquals(com.customcontentengine.domain.durability.ToolBreakPolicy.PRESERVE, item.durability().get().breakPolicy());
     }
 
+    @Test
+    void loadsItemMiningTier() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMiningAndTier()).toFile());
+
+        assertEquals(
+                3,
+                registry.findItem(new CustomItemId("ruby_pickaxe")).orElseThrow().miningToolTier().orElseThrow().level());
+    }
+
+    @Test
+    void loadsBlockMiningRequiredTier() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMiningAndTier()).toFile());
+
+        assertEquals(
+                2,
+                registry.findBlock(new CustomBlockId("ruby_ore")).orElseThrow().miningRequiredTier().orElseThrow().minimumLevel());
+    }
+
+    @Test
+    void rejectsZeroItemMiningTier() throws IOException {
+        assertInvalid(
+                validYamlWithMiningAndTier().replace("tier: 3", "tier: 0"),
+                "items.ruby_pickaxe.mining.tier must be greater than zero but was 0");
+    }
+
+    @Test
+    void rejectsNegativeItemMiningTier() throws IOException {
+        assertInvalid(
+                validYamlWithMiningAndTier().replace("tier: 3", "tier: -1"),
+                "items.ruby_pickaxe.mining.tier must be greater than zero but was -1");
+    }
+
+    @Test
+    void rejectsNonIntegerItemMiningTier() throws IOException {
+        assertInvalid(
+                validYamlWithMiningAndTier().replace("tier: 3", "tier: 3.5"),
+                "items.ruby_pickaxe.mining.tier must be an integer");
+    }
+
+    @Test
+    void rejectsZeroBlockMiningRequiredTier() throws IOException {
+        assertInvalid(
+                validYamlWithMiningAndTier().replace("required_tier: 2", "required_tier: 0"),
+                "blocks.ruby_ore.mining.required_tier must be greater than zero but was 0");
+    }
+
+    @Test
+    void rejectsNegativeBlockMiningRequiredTier() throws IOException {
+        assertInvalid(
+                validYamlWithMiningAndTier().replace("required_tier: 2", "required_tier: -1"),
+                "blocks.ruby_ore.mining.required_tier must be greater than zero but was -1");
+    }
+
+    @Test
+    void rejectsNonIntegerBlockMiningRequiredTier() throws IOException {
+        assertInvalid(
+                validYamlWithMiningAndTier().replace("required_tier: 2", "required_tier: 2.5"),
+                "blocks.ruby_ore.mining.required_tier must be an integer");
+    }
+
+    @Test
+    void rejectsItemMiningTierThatIsNotAnInteger() throws IOException {
+        assertInvalid(
+                validYamlWithMiningAndTier().replace("tier: 3", "tier: foo"),
+                "items.ruby_pickaxe.mining.tier must be an integer");
+    }
+
+    @Test
+    void rejectsBlockMiningRequiredTierThatIsNotAnInteger() throws IOException {
+        assertInvalid(
+                validYamlWithMiningAndTier().replace("required_tier: 2", "required_tier: bar"),
+                "blocks.ruby_ore.mining.required_tier must be an integer");
+    }
+
+    private String validYamlWithMiningAndTier() {
+        return """
+                schema: 1
+                blocks:
+                  ruby_ore:
+                    numeric_id: 1
+                    material_base: NOTE_BLOCK
+                    custom_model_data: 1001
+                    required_tool: ruby_pickaxe
+                    mining:
+                      hardness: 6.0
+                      required_tier: 2
+                    drops:
+                      - item: ruby
+                        amount: 1
+                items:
+                  ruby_pickaxe:
+                    material_base: DIAMOND_PICKAXE
+                    custom_model_data: 2001
+                    attributes:
+                      damage: 5.0
+                      speed: 1.2
+                      durability: 500
+                    mining:
+                      speed: 8.0
+                      tier: 3
+                """;
+    }
+
     private String validYamlWithDurability() {
         return """
                 schema: 1

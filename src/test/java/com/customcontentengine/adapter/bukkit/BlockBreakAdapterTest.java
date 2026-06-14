@@ -138,7 +138,7 @@ class BlockBreakAdapterTest {
     }
 
     private static ItemDef item(String id) {
-        return new ItemDef(new CustomItemId(id), "NOTE_BLOCK", 1001, new ToolAttributes(0.0, 1.0, 1), Optional.empty(), Optional.empty());
+        return new ItemDef(new CustomItemId(id), "NOTE_BLOCK", 1001, new ToolAttributes(0.0, 1.0, 1), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     private static final class CapturingBlockStore implements BlockStorePort {

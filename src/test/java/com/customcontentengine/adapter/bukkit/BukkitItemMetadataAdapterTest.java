@@ -50,6 +50,7 @@ class BukkitItemMetadataAdapterTest {
                 2001,
                 new ToolAttributes(5.0, 1.2, 500),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
 
         ItemStack created = adapter.createCustomItem(definition);

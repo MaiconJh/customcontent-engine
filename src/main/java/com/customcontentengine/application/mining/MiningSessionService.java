@@ -1,5 +1,8 @@
 package com.customcontentengine.application.mining;
 
+import com.customcontentengine.domain.definition.BlockDef;
+import com.customcontentengine.domain.definition.ItemDef;
+import com.customcontentengine.domain.mining.BlockTierRequirement;
 import com.customcontentengine.domain.mining.MiningDurationPolicy;
 import com.customcontentengine.domain.mining.MiningHardness;
 import com.customcontentengine.domain.mining.MiningProgress;
@@ -7,6 +10,7 @@ import com.customcontentengine.domain.mining.MiningSession;
 import com.customcontentengine.domain.mining.MiningSessionId;
 import com.customcontentengine.domain.mining.MiningStage;
 import com.customcontentengine.domain.mining.MiningSpeed;
+import com.customcontentengine.domain.mining.ToolTier;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import java.util.Objects;
@@ -21,6 +25,22 @@ public final class MiningSessionService {
     public MiningSessionService(MiningSessionRepository repository, MiningDurationPolicy durationPolicy) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.durationPolicy = Objects.requireNonNull(durationPolicy, "durationPolicy");
+    }
+
+    public static boolean canMine(Optional<ToolTier> toolTier, Optional<BlockTierRequirement> blockRequirement) {
+        if (blockRequirement.isEmpty()) {
+            return true;
+        }
+        if (toolTier.isEmpty()) {
+            return false;
+        }
+        return toolTier.get().level() >= blockRequirement.get().minimumLevel();
+    }
+
+    public boolean isTierEligible(ItemDef tool, BlockDef block) {
+        Objects.requireNonNull(tool, "tool");
+        Objects.requireNonNull(block, "block");
+        return canMine(tool.miningToolTier(), block.miningRequiredTier());
     }
 
     public MiningSession startSession(

@@ -38,7 +38,7 @@ class ItemServiceTest {
     }
 
     private ItemDef item(String id) {
-        return new ItemDef(new CustomItemId(id), "DIAMOND_PICKAXE", 2001, new ToolAttributes(5.0, 1.2, 500), Optional.empty(), Optional.empty());
+        return new ItemDef(new CustomItemId(id), "DIAMOND_PICKAXE", 2001, new ToolAttributes(5.0, 1.2, 500), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     private static final class FakeItemMetadataPort implements ItemMetadataPort<String> {

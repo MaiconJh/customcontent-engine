@@ -2,6 +2,7 @@ package com.customcontentengine.adapter.bukkit;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -15,9 +16,12 @@ import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
 import com.customcontentengine.domain.durability.ToolDurability;
+import com.customcontentengine.domain.mining.BlockTierRequirement;
 import com.customcontentengine.domain.mining.MiningDurationPolicy;
 import com.customcontentengine.domain.mining.MiningHardness;
+import com.customcontentengine.domain.mining.MiningSession;
 import com.customcontentengine.domain.mining.MiningSpeed;
+import com.customcontentengine.domain.mining.ToolTier;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
@@ -227,7 +231,8 @@ class MiningInputAdapterTest {
                 1001,
                 "ruby_pickaxe",
                 new DropTable(List.of(new DropTable.Entry("ruby", 1))),
-                miningHardness);
+                miningHardness,
+                Optional.empty());
     }
 
     private static ItemDef item(String id, Optional<MiningSpeed> miningSpeed) {
@@ -237,6 +242,7 @@ class MiningInputAdapterTest {
                 2001,
                 new ToolAttributes(5.0D, 1.2D, 500),
                 miningSpeed,
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -368,5 +374,76 @@ class MiningInputAdapterTest {
         public void clearMiningVisual(String actorKey) {
             clears.add(actorKey);
         }
+    }
+
+    private static DefinitionRegistry registryWithTiers() {
+        return new DefinitionRegistry(
+                List.of(blockWithTier("ruby_ore", (short) 1, Optional.of(new BlockTierRequirement(3)))),
+                List.of(
+                        itemWithTier("ruby", Optional.empty(), Optional.empty()),
+                        itemWithTier("ruby_pickaxe", Optional.of(new MiningSpeed(8.0D)), Optional.of(new ToolTier(1)))));
+    }
+
+    private static BlockDef blockWithTier(String id, short numericId, Optional<BlockTierRequirement> requiredTier) {
+        return new BlockDef(
+                new CustomBlockId(id),
+                numericId,
+                "NOTE_BLOCK",
+                1001,
+                "ruby_pickaxe",
+                new DropTable(List.of(new DropTable.Entry("ruby", 1))),
+                Optional.of(new MiningHardness(6.0D)),
+                requiredTier);
+    }
+
+    private static ItemDef itemWithTier(String id, Optional<MiningSpeed> speed, Optional<ToolTier> tier) {
+        return new ItemDef(
+                new CustomItemId(id),
+                "DIAMOND_PICKAXE",
+                2001,
+                new ToolAttributes(5.0D, 1.2D, 500),
+                speed,
+                tier,
+                Optional.empty());
+    }
+
+    @Test
+    void blockDamageDoesNotStartSessionWhenToolTierIsBelowBlockRequiredTier() {
+        MiningSessionService service = service();
+        MiningInputAdapter adapter = adapter(
+                registryWithTiers(),
+                new FixedBlockStore(Optional.of((short) 1)),
+                new FixedItemMetadataPort(Optional.of(TOOL_ID)),
+                service);
+        BlockDamageEvent event = blockDamageEventAt(TARGET);
+
+        adapter.onBlockDamage(event);
+
+        verify(event, never()).setCancelled(true);
+        assertFalse(service.getActiveSession(ACTOR_KEY).isPresent());
+    }
+
+    @Test
+    void heldItemChangeCancelsSessionWhenSwitchingToLowerTierTool() {
+        MiningSessionService service = service();
+        CapturingVisualPort visual = new CapturingVisualPort();
+        service.startSession(
+                ACTOR_KEY,
+                TARGET,
+                TOOL_ID,
+                new MiningHardness(6.0D),
+                new MiningSpeed(8.0D),
+                1000L);
+        MiningInputAdapter adapter = adapter(
+                registryWithTiers(),
+                new FixedBlockStore(Optional.of((short) 1)),
+                new FixedItemMetadataPort(Optional.of(new CustomItemId("ruby"))),
+                service,
+                visual);
+
+        adapter.onPlayerItemHeld(playerItemHeldEvent());
+
+        assertFalse(service.getActiveSession(ACTOR_KEY).isPresent());
+        assertEquals(List.of(ACTOR_KEY), visual.clears);
     }
 }

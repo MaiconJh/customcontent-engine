@@ -6,11 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.customcontentengine.domain.mining.BlockTierRequirement;
 import com.customcontentengine.domain.mining.MiningDurationPolicy;
 import com.customcontentengine.domain.mining.MiningHardness;
 import com.customcontentengine.domain.mining.MiningSession;
 import com.customcontentengine.domain.mining.MiningSessionId;
 import com.customcontentengine.domain.mining.MiningSpeed;
+import com.customcontentengine.domain.mining.ToolTier;
+import com.customcontentengine.internalapi.identity.CustomBlockId;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import java.util.Optional;
@@ -145,6 +148,54 @@ class MiningSessionServiceTest {
         boolean cleared = service.clearSession(ACTOR_KEY);
 
         assertFalse(cleared);
+    }
+
+    @Test
+    void canMineReturnsTrueWhenBlockHasNoRequiredTier() {
+        assertTrue(MiningSessionService.canMine(Optional.of(new ToolTier(3)), Optional.empty()));
+    }
+
+    @Test
+    void canMineReturnsTrueWhenToolHasNoTierAndBlockHasNoRequirement() {
+        assertTrue(MiningSessionService.canMine(Optional.empty(), Optional.empty()));
+    }
+
+    @Test
+    void canMineReturnsFalseWhenBlockRequiresTierButToolHasNone() {
+        assertFalse(MiningSessionService.canMine(Optional.empty(), Optional.of(new BlockTierRequirement(2))));
+    }
+
+    @Test
+    void canMineReturnsTrueWhenToolTierMeetsRequirement() {
+        assertTrue(MiningSessionService.canMine(Optional.of(new ToolTier(3)), Optional.of(new BlockTierRequirement(2))));
+    }
+
+    @Test
+    void canMineReturnsTrueWhenToolTierEqualsRequirement() {
+        assertTrue(MiningSessionService.canMine(Optional.of(new ToolTier(2)), Optional.of(new BlockTierRequirement(2))));
+    }
+
+    @Test
+    void canMineReturnsFalseWhenToolTierIsBelowRequirement() {
+        assertFalse(MiningSessionService.canMine(Optional.of(new ToolTier(1)), Optional.of(new BlockTierRequirement(2))));
+    }
+
+    @Test
+    void isTierEligibleDelegatesToCanMine() {
+        MiningSessionService service = service();
+        assertTrue(service.isTierEligible(
+                new com.customcontentengine.domain.definition.ItemDef(
+                        new CustomItemId("tool"), "DIAMOND_PICKAXE", 1001,
+                        new com.customcontentengine.domain.definition.ToolAttributes(1.0, 1.0, 100),
+                        Optional.empty(),
+                        Optional.of(new ToolTier(3)),
+                        Optional.empty()),
+                new com.customcontentengine.domain.definition.BlockDef(
+                        new com.customcontentengine.internalapi.identity.CustomBlockId("block"),
+                        (short) 1, "STONE", 1001, "tool",
+                        new com.customcontentengine.domain.definition.DropTable(java.util.List.of()),
+                        Optional.empty(),
+                        Optional.of(new BlockTierRequirement(2)))));
     }
 
     private static MiningSessionService service() {

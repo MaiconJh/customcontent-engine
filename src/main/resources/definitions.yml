@@ -8,6 +8,7 @@ blocks:
     required_tool: ruby_pickaxe
     mining:
       hardness: 6.0
+      required_tier: 2
     drops:
       - item: ruby
         amount: 1
@@ -38,6 +39,7 @@ items:
       durability: 500
     mining:
       speed: 8.0
+      tier: 3
     durability:
       max: 500
       damage_on_custom_block_break: 1

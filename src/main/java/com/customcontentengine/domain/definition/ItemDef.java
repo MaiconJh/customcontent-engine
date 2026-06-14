@@ -2,6 +2,7 @@ package com.customcontentengine.domain.definition;
 
 import com.customcontentengine.domain.durability.ToolDurabilityDefinition;
 import com.customcontentengine.domain.mining.MiningSpeed;
+import com.customcontentengine.domain.mining.ToolTier;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import java.util.Objects;
 import java.util.Optional;
@@ -12,13 +13,14 @@ public record ItemDef(
         int customModelData,
         ToolAttributes attributes,
         Optional<MiningSpeed> miningSpeed,
+        Optional<ToolTier> miningToolTier,
         Optional<ToolDurabilityDefinition> durability) {
     public ItemDef(
             CustomItemId id,
             String materialBase,
             int customModelData,
             ToolAttributes attributes) {
-        this(id, materialBase, customModelData, attributes, Optional.empty(), Optional.empty());
+        this(id, materialBase, customModelData, attributes, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     public ItemDef {
@@ -31,6 +33,7 @@ public record ItemDef(
         }
         attributes = Objects.requireNonNull(attributes, "attributes");
         miningSpeed = Objects.requireNonNull(miningSpeed, "miningSpeed");
+        miningToolTier = Objects.requireNonNull(miningToolTier, "miningToolTier");
         durability = Objects.requireNonNull(durability, "durability");
     }
 }

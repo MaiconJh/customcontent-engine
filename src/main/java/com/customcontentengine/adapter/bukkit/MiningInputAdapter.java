@@ -3,9 +3,11 @@ package com.customcontentengine.adapter.bukkit;
 import com.customcontentengine.application.mining.MiningSessionService;
 import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.ItemDef;
+import com.customcontentengine.domain.mining.BlockTierRequirement;
 import com.customcontentengine.domain.mining.MiningHardness;
 import com.customcontentengine.domain.mining.MiningSession;
 import com.customcontentengine.domain.mining.MiningSpeed;
+import com.customcontentengine.domain.mining.ToolTier;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
@@ -76,6 +78,13 @@ public final class MiningInputAdapter implements Listener {
             return;
         }
 
+        if (!miningSessionService.isTierEligible(tool.get(), block.get())) {
+            int currentTier = tool.get().miningToolTier().map(ToolTier::level).orElse(0);
+            int requiredTier = block.get().miningRequiredTier().map(BlockTierRequirement::minimumLevel).orElse(0);
+            event.getPlayer().sendMessage("§cYour tool cannot mine this block (Tier " + currentTier + "/" + requiredTier + ").");
+            return;
+        }
+
         event.setCancelled(true);
         startSession(
                 event.getPlayer().getUniqueId().toString(),
@@ -117,6 +126,11 @@ public final class MiningInputAdapter implements Listener {
                 Optional.empty() :
                 itemMetadata.readCustomItemIdentity(newItem);
         if (newToolId.isEmpty() || !newToolId.get().equals(active.get().toolId())) {
+            Optional<BlockDef> targetBlock = customBlockAt(active.get().target());
+            Optional<ItemDef> newTool = newToolId.flatMap(registry::findItem);
+            if (targetBlock.isPresent() && newTool.isPresent()) {
+                miningSessionService.isTierEligible(newTool.get(), targetBlock.get());
+            }
             miningSessionService.clearSession(actorKey);
             miningVisualPort.clearMiningVisual(actorKey);
         }
