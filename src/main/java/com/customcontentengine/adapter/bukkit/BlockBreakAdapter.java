@@ -1,7 +1,7 @@
 package com.customcontentengine.adapter.bukkit;
 
 import com.customcontentengine.application.block.BlockService;
-import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
+import com.customcontentengine.application.mechanic.MechanicEventTriggerService;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.port.ItemMetadataPort;
 import java.util.Objects;
@@ -15,21 +15,21 @@ import org.bukkit.inventory.ItemStack;
 public final class BlockBreakAdapter implements Listener {
     private final BlockService blockService;
     private final ItemMetadataPort<ItemStack> itemMetadata;
-    private final AreaBreakEventTriggerService areaBreakTriggerService;
+    private final MechanicEventTriggerService mechanicTriggerService;
 
     public BlockBreakAdapter(BlockService blockService) {
         this.blockService = Objects.requireNonNull(blockService, "blockService");
         this.itemMetadata = null;
-        this.areaBreakTriggerService = null;
+        this.mechanicTriggerService = null;
     }
 
     public BlockBreakAdapter(
             BlockService blockService,
             ItemMetadataPort<ItemStack> itemMetadata,
-            AreaBreakEventTriggerService areaBreakTriggerService) {
+            MechanicEventTriggerService mechanicTriggerService) {
         this.blockService = Objects.requireNonNull(blockService, "blockService");
         this.itemMetadata = Objects.requireNonNull(itemMetadata, "itemMetadata");
-        this.areaBreakTriggerService = Objects.requireNonNull(areaBreakTriggerService, "areaBreakTriggerService");
+        this.mechanicTriggerService = Objects.requireNonNull(mechanicTriggerService, "mechanicTriggerService");
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -39,19 +39,16 @@ public final class BlockBreakAdapter implements Listener {
         if (result.handledCustomBlockIdentity()) {
             event.setDropItems(false);
         }
-        triggerAreaBreakIfConfigured(event, origin);
+        triggerMechanicIfConfigured(event, origin);
     }
 
-    private void triggerAreaBreakIfConfigured(BlockBreakEvent event, WorldPosition origin) {
-        if (itemMetadata == null || areaBreakTriggerService == null) {
+    private void triggerMechanicIfConfigured(BlockBreakEvent event, WorldPosition origin) {
+        if (itemMetadata == null || mechanicTriggerService == null) {
             return;
         }
         ItemStack item = event.getPlayer().getInventory().getItemInMainHand();
         itemMetadata.readCustomItemIdentity(item)
-                .ifPresent(itemId -> areaBreakTriggerService.trigger(
-                        itemId,
-                        origin,
-                        event.getPlayer().getUniqueId().toString()));
+                .ifPresent(itemId -> mechanicTriggerService.trigger(itemId, origin, event.getPlayer().getUniqueId().toString()));
     }
 
     private WorldPosition toWorldPosition(Location location) {

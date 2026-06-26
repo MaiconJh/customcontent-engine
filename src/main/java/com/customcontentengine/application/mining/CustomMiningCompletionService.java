@@ -1,6 +1,6 @@
 package com.customcontentengine.application.mining;
 
-import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
+import com.customcontentengine.application.mechanic.MechanicEventTriggerService;
 import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import com.customcontentengine.internalapi.identity.CustomItemId;
@@ -19,7 +19,7 @@ public final class CustomMiningCompletionService implements MiningCompletionPort
     private final WorldMutationPort worldMutation;
     private final DropPort dropPort;
     private final RegionSafetyPort regionSafety;
-    private final AreaBreakEventTriggerService areaBreakTriggerService;
+    private final MechanicEventTriggerService mechanicTriggerService;
     private final ToolWearPort toolWearPort;
 
     public CustomMiningCompletionService(
@@ -28,14 +28,14 @@ public final class CustomMiningCompletionService implements MiningCompletionPort
             WorldMutationPort worldMutation,
             DropPort dropPort,
             RegionSafetyPort regionSafety,
-            AreaBreakEventTriggerService areaBreakTriggerService,
+            MechanicEventTriggerService mechanicTriggerService,
             ToolWearPort toolWearPort) {
         this.definitions = Objects.requireNonNull(definitions, "definitions");
         this.blockStore = Objects.requireNonNull(blockStore, "blockStore");
         this.worldMutation = Objects.requireNonNull(worldMutation, "worldMutation");
         this.dropPort = Objects.requireNonNull(dropPort, "dropPort");
         this.regionSafety = Objects.requireNonNull(regionSafety, "regionSafety");
-        this.areaBreakTriggerService = Objects.requireNonNull(areaBreakTriggerService, "areaBreakTriggerService");
+        this.mechanicTriggerService = Objects.requireNonNull(mechanicTriggerService, "mechanicTriggerService");
         this.toolWearPort = toolWearPort;
     }
 
@@ -73,7 +73,7 @@ public final class CustomMiningCompletionService implements MiningCompletionPort
             worldMutation.setBlockMaterial(request.position(), "AIR");
             dropPort.drop(request.position(), block.get().drops());
             applyToolWear(request.actorKey(), request.toolId());
-            areaBreakTriggerService.trigger(request.toolId(), request.position(), request.actorKey());
+            mechanicTriggerService.trigger(request.toolId(), request.position(), request.actorKey());
             return new CompletionResult(CompletionStatus.SUCCESS, "Custom mining completed.");
         } catch (RuntimeException exception) {
             return new CompletionResult(

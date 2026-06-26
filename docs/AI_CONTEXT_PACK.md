@@ -62,9 +62,9 @@ Completed milestones:
 - Post-MVP-1 YAML mechanic bindings.
 - Post-MVP-1 conservative runtime ownership guard.
 - MVP-2 Custom Mining.
-- CI AI Review Bot with project documentation context.
-- Continuous AI Evolution architecture initial documentation.
-- AI governance/interceptor review layer.
+- MVP-3 Custom Durability.
+- Tool Tiers: official (promoted from experimental after incubation).
+- BlockTransformMechanic: official (first mechanic after area_break, uses MECHANIC_CONFIG and BLOCK_PLACEMENT).
 
 Current major implemented systems:
 
@@ -81,8 +81,13 @@ Current major implemented systems:
 - Custom mining model:
   - `MiningHardness`.
   - `MiningSpeed`.
+  - `ToolTier` (official).
+  - `BlockTierRequirement` (official).
   - optional YAML `blocks.<id>.mining.hardness`.
   - optional YAML `items.<id>.mining.speed`.
+  - optional YAML `blocks.<id>.mining.required_tier`.
+  - optional YAML `items.<id>.mining.tier`.
+  - tier eligibility validation in `MiningSessionService.isTierEligible()`.
   - `MiningSession`.
   - absolute-time progress.
   - visual mining stages.
@@ -229,10 +234,12 @@ Current core capabilities:
 
 - `BLOCK_QUERY`
 - `BLOCK_MUTATION`
+- `BLOCK_PLACEMENT`
 - `BUDGET_VIEW`
 - `COOLDOWN_VIEW`
 - `DROP_SINK`
 - `EXECUTION_ORIGIN`
+- `MECHANIC_CONFIG`
 
 Mechanic result:
 
@@ -249,9 +256,10 @@ Mechanic rules:
 - Mechanics must not access services, registries, schedulers, PDC, YAML, adapters, or platform internals.
 - `MechanicExecutor` owns cooldown, budget, context creation, execution, `Partial` interpretation, and rescheduling.
 
-Current official builtin mechanic:
+Current official builtin mechanics:
 
 - `area_break`
+- `block_transform`
 
 `area_break` rules:
 
@@ -286,16 +294,29 @@ Rules:
 
 - `mechanics` is optional.
 - Only `on_block_break` is currently supported.
-- `on_block_break` is a simple list of `MechanicId` values.
+- `on_block_break` is a list of `MechanicId` values or mechanic entries with optional `arguments`.
 - Referenced mechanics must exist in `MechanicRegistry`.
-- Current official/builtin mechanic accepted in this phase: `area_break`.
-- No arguments.
+- Current official/builtin mechanics accepted in this phase: `area_break`, `block_transform`.
+- `block_transform` accepts arguments via `MECHANIC_CONFIG`: `to_block`, `drop_original`, `consume_budget`.
 - No conditions.
 - No expressions.
 - No scripting.
 - No permission expressions.
 - No cooldown/budget YAML configuration.
 - Schema remains `1` because the change is additive/backward compatible.
+
+Example with arguments:
+
+```yaml
+items:
+  ruby_pickaxe:
+    mechanics:
+      on_block_break:
+        - block_transform
+          arguments:
+            to_block: 42
+            drop_original: true
+```
 
 ---
 

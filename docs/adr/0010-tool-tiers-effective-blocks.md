@@ -1,7 +1,8 @@
 # ADR 0010 - Tool Tiers and Effective Blocks
 
-Status: Accepted  
+Status: Accepted (Official)  
 Accepted: 2026-06-14  
+Promoted to Official: 2026-06-25  
 Date: 2026-06-14
 
 ---
@@ -203,3 +204,46 @@ Tiers are inherently a mining property. Isolating them before they are proven ne
 - ADR-0009 — Custom Mining Model.
 - `docs/spikes/004-tool-tiers-effective-blocks.md` — feasibility analysis and recommended design bounds.
 - `docs/milestones/MVP-2-COMPLETE.md` — current mining completion guarantees and limitations.
+
+---
+
+## Promotion to Official Status (2026-06-25)
+
+### Rationale
+
+The Tool Tiers feature has demonstrated repeated structural value across multiple definitions and remains independent of any specific mechanic. Per ADR-0006 criteria:
+
+1. **Repeated structural value**: Four distinct blocks (stone_quarry, iron_ore, ruby_ore, sapphire_ore) use tier requirements, each paired with appropriate tools across four tier levels.
+
+2. **No platform leakage**: `ToolTier` and `BlockTierRequirement` remain pure domain value objects with no Bukkit/Paper/Folia dependencies.
+
+3. **Mechanical independence**: Tier checks occur in the mining layer, not mechanics. The `area_break` mechanic remains unchanged and tier-unaware, demonstrating the separation of concerns.
+
+4. **Test coverage**: Domain tests (`ToolTierTest`, `BlockTierRequirementTest`, `MiningSessionServiceTest`) cover validation and eligibility logic.
+
+5. **Simplification**: Tier configuration is simpler than requiring specific tool names or enchantments, providing clean progression semantics.
+
+### Status Change
+
+- **From**: Experimental (incubating under ADR-0006 pipeline)
+- **To**: Official (maintained module, not part of stable core)
+
+### Evidence Document
+
+See `docs/tier-evidence-for-promotion.md` for detailed evidence of structural value and reuse.
+
+---
+
+## Promotion to Official Consequences
+
+### Positive
+
+- Tool tiers are now an official feature with documentation obligation fulfilled.
+- Server administrators can use tiers with confidence that the feature is maintained.
+- The implementation is stable and tested.
+
+### Negative
+
+- This does not promote tiers to stable core (per ADR-0003, that requires broader multi-module need).
+- No compatibility guarantee is provided beyond the current release.
+- Future tier extensions (e.g., mechanic-level tier checks) would require separate ADR consideration.

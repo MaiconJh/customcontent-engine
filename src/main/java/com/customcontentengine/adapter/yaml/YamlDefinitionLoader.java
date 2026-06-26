@@ -19,6 +19,7 @@ import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.mechanic.MechanicId;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -166,17 +167,47 @@ private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
             CustomItemId itemId = itemId(id);
             for (String triggerKey : mechanics.getKeys(false)) {
                 MechanicTrigger trigger = mechanicTrigger(id, triggerKey);
-                List<?> mechanicIds = mechanics.getList(triggerKey);
-                for (int index = 0; index < mechanicIds.size(); index++) {
-                    bindings.add(new MechanicBinding(
-                            itemId,
-                            trigger,
-                            mechanicId(id, triggerKey, index, (String) mechanicIds.get(index))));
+                List<?> mechanicEntries = mechanics.getList(triggerKey);
+                validateMechanicList(id, triggerKey, mechanicEntries);
+                for (int index = 0; index < mechanicEntries.size(); index++) {
+                    Object entry = mechanicEntries.get(index);
+                    if (entry instanceof String mechanicIdStr) {
+                        bindings.add(new MechanicBinding(itemId, trigger, mechanicId(id, triggerKey, index, mechanicIdStr)));
+                    } else if (entry instanceof Map<?, ?> mechanicMap) {
+                        ParsedMechanic parsed = parseMechanicMap(id, triggerKey, index, mechanicMap);
+                        bindings.add(new MechanicBinding(itemId, trigger, mechanicId(id, triggerKey, index, parsed.mechanicId), parsed.arguments));
+                    }
                 }
             }
         }
         return new MechanicBindingRegistry(bindings);
     }
+
+    private void validateMechanicList(String itemId, String triggerKey, List<?> mechanicEntries) {
+        if (mechanicEntries == null || mechanicEntries.isEmpty()) {
+            throw new YamlDefinitionException("Invalid definitions.yml: items." + itemId + ".mechanics." + triggerKey + " must contain at least one mechanic id");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private ParsedMechanic parseMechanicMap(String itemId, String triggerKey, int index, Map<?, ?> mechanicMap) {
+        String mechanicId = null;
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : mechanicMap.entrySet()) {
+            String key = entry.getKey().toString();
+            if (mechanicId == null) {
+                mechanicId = key;
+            } else {
+                arguments.put(key, entry.getValue());
+            }
+        }
+        if (mechanicId == null) {
+            throw new YamlDefinitionException("Invalid definitions.yml: items." + itemId + ".mechanics." + triggerKey + "[" + index + "] is missing mechanic id");
+        }
+        return new ParsedMechanic(mechanicId, arguments);
+    }
+
+    private record ParsedMechanic(String mechanicId, Map<String, Object> arguments) { }
 
     private CustomBlockId blockId(String id) {
         try {

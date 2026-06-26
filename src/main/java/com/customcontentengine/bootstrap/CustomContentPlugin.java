@@ -19,16 +19,18 @@ import com.customcontentengine.adapter.yaml.YamlDefinitionLoader;
 import com.customcontentengine.adapter.yaml.YamlDefinitionValidator;
 import com.customcontentengine.application.block.BlockService;
 import com.customcontentengine.application.item.ItemService;
-import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
 import com.customcontentengine.application.mechanic.AreaBreakRuntimeService;
 import com.customcontentengine.application.mechanic.MechanicBindingValidator;
+import com.customcontentengine.application.mechanic.MechanicEventTriggerService;
 import com.customcontentengine.application.mechanic.MechanicRegistry;
+import com.customcontentengine.application.mechanic.MechanicRuntimeService;
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
 import com.customcontentengine.application.mining.InMemoryMiningSessionRepository;
 import com.customcontentengine.application.mining.CustomMiningCompletionService;
 import com.customcontentengine.application.mining.MiningRuntimeProcessor;
 import com.customcontentengine.application.mining.MiningSessionService;
 import com.customcontentengine.builtin.mechanic.AreaBreakMechanic;
+import com.customcontentengine.builtin.mechanic.BlockTransformMechanic;
 import com.customcontentengine.domain.mining.MiningDurationPolicy;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import java.util.List;
@@ -53,8 +55,12 @@ public final class CustomContentPlugin extends JavaPlugin {
         ItemService<ItemStack> itemService = new ItemService<>(registry, itemMetadata);
         BukkitDropAdapter dropPort = new BukkitDropAdapter(itemService);
         BlockService blockService = new BlockService(registry, blockStore, dropPort);
-        MechanicRegistry mechanicRegistry = new MechanicRegistry(List.of(new AreaBreakMechanic()));
-        new MechanicBindingValidator(mechanicRegistry, java.util.Set.of(AreaBreakMechanic.ID))
+        MechanicRegistry mechanicRegistry = new MechanicRegistry(List.of(
+                new AreaBreakMechanic(),
+                new BlockTransformMechanic()));
+        new MechanicBindingValidator(mechanicRegistry, java.util.Set.of(
+                        AreaBreakMechanic.ID,
+                        BlockTransformMechanic.ID))
                 .validate(registry.mechanicBindings());
         PaperRegionSafetyAdapter regionSafety = new PaperRegionSafetyAdapter();
         BukkitWorldMutationAdapter worldMutation = new BukkitWorldMutationAdapter(regionSafety);
@@ -70,10 +76,18 @@ public final class CustomContentPlugin extends JavaPlugin {
                 cooldowns,
                 scheduler,
                 regionSafety);
-AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerService(
+        MechanicRuntimeService mechanicRuntime = new MechanicRuntimeService(
+                mechanicRegistry,
+                registry,
+                blockStore,
+                dropPort,
+                worldMutation,
+                cooldowns,
+                scheduler,
+                regionSafety);
+        MechanicEventTriggerService mechanicTrigger = new MechanicEventTriggerService(
                 registry.mechanicBindings(),
-                AreaBreakMechanic.ID,
-                areaBreakRuntime);
+                mechanicRuntime);
         BukkitToolWearAdapter toolWear = new BukkitToolWearAdapter(registry, itemMetadata);
         MiningSessionService miningSessionService = new MiningSessionService(
                 new InMemoryMiningSessionRepository(),
@@ -85,7 +99,7 @@ AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerSe
                 worldMutation,
                 dropPort,
                 regionSafety,
-                areaBreakEventTrigger,
+                mechanicTrigger,
                 toolWear);
         MiningRuntimeProcessor miningRuntimeProcessor = new MiningRuntimeProcessor(
                 miningSessionService,
@@ -95,7 +109,7 @@ AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerSe
 
         getServer().getPluginManager().registerEvents(new BlockPlaceAdapter(blockService, itemMetadata), this);
         getServer().getPluginManager().registerEvents(
-                new BlockBreakAdapter(blockService, itemMetadata, areaBreakEventTrigger),
+                new BlockBreakAdapter(blockService, itemMetadata, mechanicTrigger),
                 this);
         getServer().getPluginManager().registerEvents(
                 new MiningInputAdapter(registry, blockStore, itemMetadata, miningSessionService, miningVisual),
