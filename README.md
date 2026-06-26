@@ -10,7 +10,7 @@ The project follows a conservative-but-evolvable core model: the core stays smal
 - MVP-1: Complete for the controlled `area_break` scope.
 - MVP-2: Complete for the custom mining scope.
 - MVP-3: Complete for custom tool durability and wear.
-- MVP-4: Experimental mining tiers and effective-block behavior (optional YAML fields, tier-gated mining sessions).
+- Tool Tiers: Official (implemented as official mining feature, not experimental).
 - Folia: architectural goal; advanced cross-region behavior is not promised as final support yet.
 - Public API: not stable and not available yet.
 
@@ -280,7 +280,7 @@ Durability behavior:
 
 MVP-3 Limitation: Tool durability wear is applied once per custom mining completion, regardless of how many blocks are broken by AreaBreak. Additional blocks broken by `area_break` do not multiply the durability damage.
 
-## Mining Tiers (Experimental)
+## Mining Tiers (Official)
 
 Mining tiers add optional progression gating to custom mining without changing hardness, speed, or durability.
 
@@ -324,17 +324,70 @@ items:
 - Player-facing feedback is owned by the adapter layer.
 - No new core capability, scheduler contract, or public API is introduced.
 
-### Known Limitations
+### Example Tier Progression
 
-- Tiers are experimental and may change.
-- Tiers are purely a mining eligibility check; they do not modify mining speed, durability wear, or `area_break` behavior.
-- There is no tool upgrade, enchantment, or GUI integration for tiers.
+```yaml
+blocks:
+  stone_quarry:
+    numeric_id: 1
+    required_tool: stone_pickaxe
+    mining:
+      hardness: 2.0
+      required_tier: 1
+
+  iron_ore:
+    numeric_id: 2
+    required_tool: iron_pickaxe
+    mining:
+      hardness: 4.0
+      required_tier: 2
+
+  ruby_ore:
+    numeric_id: 3
+    required_tool: ruby_pickaxe
+    mining:
+      hardness: 6.0
+      required_tier: 3
+
+  sapphire_ore:
+    numeric_id: 4
+    required_tool: sapphire_pickaxe
+    mining:
+      hardness: 8.0
+      required_tier: 4
+```
+
+### Stability
+
+- This feature is **official** but not part of the stable core.
+- It is maintained by the project and may be used with confidence.
+- Breaking changes require ADR and version consideration.
+- No compatibility guarantee is provided for future versions without ADR revision.
+
+## BlockTransformMechanic (Official)
+
+`block_transform` is the second official builtin mechanic. It transforms a custom block at the execution origin into another block or material.
+
+Example YAML:
+
+```yaml
+items:
+  ruby_pickaxe:
+    mechanics:
+      on_block_break:
+        - block_transform
+          arguments:
+            to_block: 42           # numeric_id of a custom block, or a material name like "stone"
+            drop_original: true    # optional, default false
+            consume_budget: true   # optional, default true
+```
+
+The mechanic uses the `MECHANIC_CONFIG` capability to read arguments. It is pure, stateless, and independent of Bukkit/Paper.
 
 ## Current Limitations
 
-- No second mechanic beyond `area_break`.
+- No third mechanic beyond `area_break` and `block_transform`.
 - No `vein_miner`.
-- No `block_transform`.
 - No `auto_smelt`.
 - No Fortune or Silk Touch.
 - No Efficiency enchantment support.
@@ -467,7 +520,7 @@ Recommended post-MVP-3 work:
 - Harden MVP-3 durability, mining, and `area_break` integration tests.
 - Refine Folia ownership validation and document advanced cross-region behavior.
 - Define devtools policy, including future treatment of `/debugareabreak`.
-- Evaluate a second mechanic only through the incubation process.
+- Evaluate a third mechanic only through the incubation process.
 
 Any expansion after MVP-3 must follow the project scope, architecture guardrails, accepted ADRs, and the incubation or ADR process required for new contracts, scheduler changes, YAML schema changes, persistence changes, extension points, mining behavior changes, durability behavior changes, or additional mechanics.
 

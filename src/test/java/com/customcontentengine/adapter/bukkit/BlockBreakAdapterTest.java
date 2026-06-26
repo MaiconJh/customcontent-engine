@@ -6,7 +6,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.customcontentengine.application.block.BlockService;
-import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
+import com.customcontentengine.application.mechanic.MechanicEventTriggerService;
 import com.customcontentengine.domain.durability.ToolDurability;
 import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
@@ -54,7 +54,7 @@ class BlockBreakAdapterTest {
 
     @Test
     void doesNotTriggerAreaBreakWhenHeldItemIsNotCustom() {
-        AreaBreakEventTriggerService triggerService = mock(AreaBreakEventTriggerService.class);
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
         BlockBreakAdapter adapter = new BlockBreakAdapter(
                 service(new CapturingBlockStore(Optional.empty()), new NoopDropPort()),
                 new FixedItemMetadataPort(Optional.empty()),
@@ -68,7 +68,7 @@ class BlockBreakAdapterTest {
 
     @Test
     void delegatesCustomHeldItemToAreaBreakTriggerService() {
-        AreaBreakEventTriggerService triggerService = mock(AreaBreakEventTriggerService.class);
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
         BlockBreakAdapter adapter = new BlockBreakAdapter(
                 service(new CapturingBlockStore(Optional.empty()), new NoopDropPort()),
                 new FixedItemMetadataPort(Optional.of(new CustomItemId("ruby_pickaxe"))),
@@ -83,7 +83,7 @@ class BlockBreakAdapterTest {
 
     @Test
     void keepsOriginHandledByMvp0WhenAreaBreakToolIsUsed() {
-        AreaBreakEventTriggerService triggerService = mock(AreaBreakEventTriggerService.class);
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
         CapturingBlockStore blockStore = new CapturingBlockStore(Optional.of((short) 1));
         CapturingDropPort dropPort = new CapturingDropPort();
         BlockBreakAdapter adapter = new BlockBreakAdapter(

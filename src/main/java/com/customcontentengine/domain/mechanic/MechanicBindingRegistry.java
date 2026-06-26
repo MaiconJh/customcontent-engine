@@ -9,21 +9,21 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class MechanicBindingRegistry {
-    private final Map<CustomItemId, Map<MechanicTrigger, List<MechanicId>>> bindings;
+    private final Map<CustomItemId, Map<MechanicTrigger, List<MechanicBinding>>> bindings;
 
     public MechanicBindingRegistry(Collection<MechanicBinding> bindings) {
-        Map<CustomItemId, Map<MechanicTrigger, java.util.ArrayList<MechanicId>>> mutable = new LinkedHashMap<>();
+        Map<CustomItemId, Map<MechanicTrigger, java.util.ArrayList<MechanicBinding>>> mutable = new LinkedHashMap<>();
         for (MechanicBinding binding : bindings == null ? List.<MechanicBinding>of() : bindings) {
             mutable
                     .computeIfAbsent(binding.itemId(), ignored -> new LinkedHashMap<>())
                     .computeIfAbsent(binding.trigger(), ignored -> new java.util.ArrayList<>())
-                    .add(binding.mechanicId());
+                    .add(binding);
         }
 
-        Map<CustomItemId, Map<MechanicTrigger, List<MechanicId>>> immutable = new LinkedHashMap<>();
+        Map<CustomItemId, Map<MechanicTrigger, List<MechanicBinding>>> immutable = new LinkedHashMap<>();
         mutable.forEach((itemId, byTrigger) -> {
-            Map<MechanicTrigger, List<MechanicId>> triggerMap = new LinkedHashMap<>();
-            byTrigger.forEach((trigger, mechanicIds) -> triggerMap.put(trigger, List.copyOf(mechanicIds)));
+            Map<MechanicTrigger, List<MechanicBinding>> triggerMap = new LinkedHashMap<>();
+            byTrigger.forEach((trigger, bindingList) -> triggerMap.put(trigger, List.copyOf(bindingList)));
             immutable.put(itemId, Map.copyOf(triggerMap));
         });
         this.bindings = Map.copyOf(immutable);
@@ -36,22 +36,31 @@ public final class MechanicBindingRegistry {
     public List<MechanicId> mechanicIdsFor(CustomItemId itemId, MechanicTrigger trigger) {
         Objects.requireNonNull(itemId, "itemId");
         Objects.requireNonNull(trigger, "trigger");
-        return bindings.getOrDefault(itemId, Map.of()).getOrDefault(trigger, List.of());
+        return bindings.getOrDefault(itemId, Map.of()).getOrDefault(trigger, List.of()).stream()
+                .map(MechanicBinding::mechanicId)
+                .toList();
+    }
+
+    public MechanicBinding bindingFor(CustomItemId itemId, MechanicTrigger trigger, MechanicId mechanicId) {
+        Objects.requireNonNull(itemId, "itemId");
+        Objects.requireNonNull(trigger, "trigger");
+        Objects.requireNonNull(mechanicId, "mechanicId");
+        return bindings.getOrDefault(itemId, Map.of())
+                .getOrDefault(trigger, List.of()).stream()
+                .filter(binding -> binding.mechanicId().equals(mechanicId))
+                .findFirst()
+                .orElse(null);
     }
 
     public boolean contains(CustomItemId itemId, MechanicTrigger trigger, MechanicId mechanicId) {
         Objects.requireNonNull(mechanicId, "mechanicId");
-        return mechanicIdsFor(itemId, trigger).contains(mechanicId);
+        return bindingFor(itemId, trigger, mechanicId) != null;
     }
 
     public List<MechanicBinding> bindings() {
         return bindings.entrySet().stream()
                 .flatMap(itemEntry -> itemEntry.getValue().entrySet().stream()
-                        .flatMap(triggerEntry -> triggerEntry.getValue().stream()
-                                .map(mechanicId -> new MechanicBinding(
-                                        itemEntry.getKey(),
-                                        triggerEntry.getKey(),
-                                        mechanicId))))
+                        .flatMap(triggerEntry -> triggerEntry.getValue().stream()))
                 .toList();
     }
 }
