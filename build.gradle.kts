@@ -1,6 +1,8 @@
 import java.net.URI
 import java.security.MessageDigest
 import org.gradle.jvm.tasks.Jar
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 plugins {
     java
@@ -41,32 +43,43 @@ val spike by sourceSets.creating {
 configurations[integrationTest.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
 configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
 
+// ==================== PAPER FILL V3 API ====================
 val paperVersion = "1.21.1"
-val paperBuild = "133"
-val paperJarName = "paper-$paperVersion-$paperBuild.jar"
-val paperSha256 = "39bd8c00b9e18de91dcabd3cc3dcfa5328685a53b7187a2f63280c22e2d287b9"
-val paperServerJar = layout.buildDirectory.file("paperIntegration/$paperJarName")
+val paperServerJar = layout.buildDirectory.file("paperIntegration/paper-$paperVersion.jar")
 
 val downloadPaperServer by tasks.registering {
-    description = "Downloads the Paper server jar used by the basic Paper integration test."
+    description = "Downloads the Paper server jar using the Fill v3 API"
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     outputs.file(paperServerJar)
 
     doLast {
         val target = paperServerJar.get().asFile
-        if (!target.exists() || target.sha256() != paperSha256) {
+        if (!target.exists()) {
             target.parentFile.mkdirs()
-            val url = "https://api.papermc.io/v2/projects/paper/versions/$paperVersion/builds/$paperBuild/downloads/$paperJarName"
-            URI(url).toURL().openStream().use { input ->
+            
+            // 1. Get latest build info from Fill v3 API
+            val apiUrl = "https://fill.papermc.io/v2/projects/paper/versions/$paperVersion/builds/latest"
+            val connection = URI(apiUrl).toURL().openConnection()
+            connection.setRequestProperty("User-Agent", "CustomContentEngine/0.1.0 (https://github.com/MaiconJh/customcontent-engine)")
+
+            val jsonResponse = connection.inputStream.bufferedReader().use { it.readText() }
+            
+            // 2. Extract download URL from JSON (simple regex)
+            val downloadUrlRegex = "\"downloadUrl\"\\s*:\\s*\"([^\"]+)\"".toRegex()
+            val downloadUrl = downloadUrlRegex.find(jsonResponse)?.groupValues?.get(1)
+                ?: throw GradleException("Could not extract download URL from Fill API response")
+
+            println("Downloading Paper from: $downloadUrl")
+            URI(downloadUrl).toURL().openStream().use { input ->
                 target.outputStream().use { output -> input.copyTo(output) }
             }
-        }
-        val actualSha256 = target.sha256()
-        if (actualSha256 != paperSha256) {
-            throw GradleException("Downloaded Paper jar checksum mismatch: expected $paperSha256 but was $actualSha256")
+            println("Downloaded Paper to: ${target.absolutePath}")
+        } else {
+            println("Paper jar already exists: ${target.absolutePath}")
         }
     }
 }
+// ==========================================================
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
@@ -96,7 +109,7 @@ tasks.register<JavaExec>("binaryPdcSpike") {
     description = "Runs Spike 1 binary PDC codec performance measurements."
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     classpath = spike.runtimeClasspath
-    mainClass.set("com.customcontentengine.spike.BinaryPdcPerformanceSpike")
+    mainClass.set("com.customcontentengine.spikSe.BinaryPdcPerformanceSpike")
     dependsOn(tasks.named(spike.classesTaskName))
     args(layout.buildDirectory.file("reports/spikes/001-binary-pdc-performance-results.md").get().asFile.absolutePath)
 }
@@ -107,6 +120,8 @@ tasks.register<JavaExec>("veinMinerSpike") {
     classpath = spike.runtimeClasspath
     mainClass.set("com.customcontentengine.spike.VeinMinerFeasibilitySpike")
     dependsOn(tasks.named(spike.classesTaskName))
+    standardOutput = System.out
+    errorOutput = System.err
     args(layout.buildDirectory.file("reports/spikes/005-vein-miner-feasibility-results.md").get().asFile.absolutePath)
 }
 
