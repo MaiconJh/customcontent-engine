@@ -57,15 +57,11 @@ val downloadPaperServer by tasks.registering {
         if (!target.exists()) {
             target.parentFile.mkdirs()
 
-            // 1. Consulta a API v3 para obter os dados do build mais recente
             val apiUrl = "https://fill.papermc.io/v3/projects/paper/versions/$paperVersion/builds/latest"
             val connection = URI(apiUrl).toURL().openConnection()
-            // A nova API exige um User-Agent válido e não genérico
             connection.setRequestProperty("User-Agent", "CustomContentEngine/0.1.0 (https://github.com/MaiconJh/customcontent-engine)")
 
             val jsonResponse = connection.inputStream.bufferedReader().use { it.readText() }
-
-            // 2. Extrai a URL de download do JSON (usando um parser simples)
             val downloadUrl = extractDownloadUrl(jsonResponse)
 
             println("Downloading Paper from: $downloadUrl")
@@ -79,14 +75,11 @@ val downloadPaperServer by tasks.registering {
     }
 }
 
-// Função auxiliar para extrair a URL de download do JSON
 fun extractDownloadUrl(json: String): String {
-    // Procura pelo campo "downloadUrl" na resposta JSON
-    val regex = "\"downloadUrl\"\\s*:\\s*\"([^\"]+)\"".toRegex()
+    val regex = "\"server:default\"\\s*:\\s*\\{[^}]*\"url\"\\s*:\\s*\"([^\"]+)\"".toRegex()
     return regex.find(json)?.groupValues?.get(1)
         ?: throw GradleException("Could not find download URL in API response: $json")
 }
-// ==========================================================
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
