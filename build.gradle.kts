@@ -1,8 +1,5 @@
 import java.net.URI
-import java.security.MessageDigest
 import org.gradle.jvm.tasks.Jar
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 plugins {
     java
@@ -43,9 +40,9 @@ val spike by sourceSets.creating {
 configurations[integrationTest.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
 configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
 
-// ==================== PAPER FILL V3 API ====================
 val paperVersion = "1.21.1"
-val paperServerJar = layout.buildDirectory.file("paperIntegration/paper-$paperVersion.jar")
+val paperJarName = "paper-$paperVersion.jar"
+val paperServerJar = layout.buildDirectory.file("paperIntegration/$paperJarName")
 
 val downloadPaperServer by tasks.registering {
     description = "Downloads the Paper server jar using the Fill v3 API"
@@ -76,6 +73,7 @@ val downloadPaperServer by tasks.registering {
 }
 
 fun extractDownloadUrl(json: String): String {
+    // Busca pela URL dentro de "server:default" no objeto "downloads"
     val regex = "\"server:default\"\\s*:\\s*\\{[^}]*\"url\"\\s*:\\s*\"([^\"]+)\"".toRegex()
     return regex.find(json)?.groupValues?.get(1)
         ?: throw GradleException("Could not find download URL in API response: $json")
@@ -109,7 +107,7 @@ tasks.register<JavaExec>("binaryPdcSpike") {
     description = "Runs Spike 1 binary PDC codec performance measurements."
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     classpath = spike.runtimeClasspath
-    mainClass.set("com.customcontentengine.spikSe.BinaryPdcPerformanceSpike")
+    mainClass.set("com.customcontentengine.spike.BinaryPdcPerformanceSpike")
     dependsOn(tasks.named(spike.classesTaskName))
     args(layout.buildDirectory.file("reports/spikes/001-binary-pdc-performance-results.md").get().asFile.absolutePath)
 }
@@ -123,19 +121,4 @@ tasks.register<JavaExec>("veinMinerSpike") {
     standardOutput = System.out
     errorOutput = System.err
     args(layout.buildDirectory.file("reports/spikes/005-vein-miner-feasibility-results.md").get().asFile.absolutePath)
-}
-
-fun File.sha256(): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    inputStream().use { input ->
-        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        while (true) {
-            val read = input.read(buffer)
-            if (read < 0) {
-                break
-            }
-            digest.update(buffer, 0, read)
-        }
-    }
-    return digest.digest().joinToString("") { "%02x".format(it) }
 }
