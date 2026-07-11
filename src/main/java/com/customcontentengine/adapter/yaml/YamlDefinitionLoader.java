@@ -4,6 +4,7 @@ import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
+import com.customcontentengine.domain.durability.ToolBreakPolicy;
 import com.customcontentengine.domain.durability.ToolDurabilityDefinition;
 import com.customcontentengine.domain.mechanic.MechanicBinding;
 import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
