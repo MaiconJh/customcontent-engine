@@ -4,6 +4,7 @@ import org.gradle.jvm.tasks.Jar
 
 plugins {
     java
+    id("me.champeau.jmh") version "0.7.2"  // JMH plugin for microbenchmarks
 }
 
 group = "com.customcontentengine"
@@ -25,6 +26,8 @@ dependencies {
     testImplementation("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
 }
 
+// ========== SOURCE SETS ==========
+
 val integrationTest by sourceSets.creating {
     java.srcDir("src/integrationTest/java")
     resources.srcDir("src/integrationTest/resources")
@@ -38,8 +41,17 @@ val spike by sourceSets.creating {
     runtimeClasspath += output + compileClasspath
 }
 
+// JMH source set – benchmarks go in src/jmh/java
+val jmh by sourceSets.creating {
+    java.srcDir("src/jmh/java")
+    compileClasspath += sourceSets.main.get().output + sourceSets.spike.get().output
+    runtimeClasspath += output + compileClasspath
+}
+
 configurations[integrationTest.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
 configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
+
+// ========== PAPER SERVER DOWNLOAD ==========
 
 val paperVersion = "1.21.1"
 val paperBuild = "133"
@@ -82,10 +94,14 @@ fun extractDownloadUrl(json: String): String {
     return serverDefault["url"] as String
 }
 
+// ========== COMPILATION ==========
+
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.release.set(21)
 }
+
+// ========== TEST TASKS ==========
 
 tasks.test {
     useJUnitPlatform()
@@ -106,6 +122,8 @@ tasks.register<Test>("integrationTest") {
     }
 }
 
+// ========== SPIKE TASKS (manual benchmarks) ==========
+
 tasks.register<JavaExec>("binaryPdcSpike") {
     description = "Runs Spike 1 binary PDC codec performance measurements."
     group = LifecycleBasePlugin.VERIFICATION_GROUP
@@ -124,4 +142,46 @@ tasks.register<JavaExec>("veinMinerSpike") {
     standardOutput = System.out
     errorOutput = System.err
     args(layout.buildDirectory.file("reports/spikes/005-vein-miner-feasibility-results.md").get().asFile.absolutePath)
+}
+
+// ========== JMH CONFIGURATION ==========
+
+jmh {
+    // Use the dedicated JMH source set
+    sourceSets = setOf(jmh)
+
+    // Benchmark parameters
+    warmupIterations.set(5)          // Number of warmup iterations
+    iterations.set(10)               // Number of measurement iterations
+    fork.set(2)                      // Number of JVM forks (2 for statistical confidence)
+    timeOnIteration.set("1s")        // Time per iteration (1 second per iteration)
+    warmupTimeOnIteration.set("1s")  // Warmup time per iteration
+    timeUnit.set("us")               // Output time unit (microseconds)
+    resultFormat.set("JSON")         // Output format (CSV, JSON, TEXT)
+    resultsFile.set(layout.buildDirectory.file("reports/jmh/results.json"))
+    includeTests.set(false)          // Don't run tests as benchmarks
+    jmhVersion.set("1.37")           // JMH version (override default if needed)
+}
+
+// Optional: task to run JMH benchmarks specifically
+tasks.register<JavaExec>("jmhRun") {
+    description = "Runs JMH benchmarks using the JMH plugin configuration."
+    group = "benchmark"
+    dependsOn(tasks.named("jmh"))
+    // The 'jmh' task is automatically created by the plugin
+    // This just provides a convenient alias
+}
+
+// ========== CONFIGURATION FOR JMH SOURCE SET ==========
+
+// Ensure JMH dependencies include spike classes
+configurations[jmh.implementationConfigurationName].extendsFrom(configurations.spike.implementationConfigurationName.get())
+configurations[jmh.runtimeOnlyConfigurationName].extendsFrom(configurations.spike.runtimeOnlyConfigurationName.get())
+
+// ========== OTHER TASKS ==========
+
+// If you want to run all checks (test, integrationTest, jmh) together:
+tasks.register("checkAll") {
+    dependsOn(tasks.test, tasks.integrationTest, tasks.jmh)
+    description = "Runs all tests and JMH benchmarks."
 }
