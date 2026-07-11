@@ -69,13 +69,15 @@ class MechanicContractTest {
         assertTrue(EnumSet.allOf(Capability.class).containsAll(Set.of(
                 Capability.BLOCK_QUERY,
                 Capability.BLOCK_MUTATION,
+                Capability.BLOCK_PLACEMENT,
                 Capability.BUDGET_VIEW,
                 Capability.COOLDOWN_VIEW,
                 Capability.DROP_SINK,
                 Capability.EXECUTION_ORIGIN,
                 Capability.ENCHANTMENT_VIEW,
-                Capability.MECHANIC_ARGUMENTS
+                Capability.MECHANIC_ARGUMENTS,
+                Capability.MECHANIC_CONFIG
         )));
-        assertEquals(8, Capability.values().length);
+        assertEquals(10, Capability.values().length);
     }
 }

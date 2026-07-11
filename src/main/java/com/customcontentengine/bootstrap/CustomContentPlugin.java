@@ -23,7 +23,9 @@ import com.customcontentengine.application.item.ItemService;
 import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
 import com.customcontentengine.application.mechanic.AreaBreakRuntimeService;
 import com.customcontentengine.application.mechanic.MechanicBindingValidator;
+import com.customcontentengine.application.mechanic.MechanicEventTriggerService;
 import com.customcontentengine.application.mechanic.MechanicRegistry;
+import com.customcontentengine.application.mechanic.MechanicRuntimeService;
 import com.customcontentengine.application.mechanic.VeinMinerEventTriggerService;
 import com.customcontentengine.application.mechanic.VeinMinerRuntimeService;
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
@@ -32,6 +34,7 @@ import com.customcontentengine.application.mining.CustomMiningCompletionService;
 import com.customcontentengine.application.mining.MiningRuntimeProcessor;
 import com.customcontentengine.application.mining.MiningSessionService;
 import com.customcontentengine.builtin.mechanic.AreaBreakMechanic;
+import com.customcontentengine.builtin.mechanic.BlockTransformMechanic;
 import com.customcontentengine.builtin.mechanic.VeinMinerMechanic;
 import com.customcontentengine.domain.mining.MiningDurationPolicy;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
@@ -57,8 +60,14 @@ public final class CustomContentPlugin extends JavaPlugin {
         ItemService<ItemStack> itemService = new ItemService<>(registry, itemMetadata);
         BukkitDropAdapter dropPort = new BukkitDropAdapter(itemService);
         BlockService blockService = new BlockService(registry, blockStore, dropPort);
-        MechanicRegistry mechanicRegistry = new MechanicRegistry(List.of(new AreaBreakMechanic(), new VeinMinerMechanic()));
-        new MechanicBindingValidator(mechanicRegistry, java.util.Set.of(AreaBreakMechanic.ID, VeinMinerMechanic.ID))
+        MechanicRegistry mechanicRegistry = new MechanicRegistry(List.of(
+                new AreaBreakMechanic(),
+                new BlockTransformMechanic(),
+                new VeinMinerMechanic()));
+        new MechanicBindingValidator(mechanicRegistry, java.util.Set.of(
+                        AreaBreakMechanic.ID,
+                        BlockTransformMechanic.ID,
+                        VeinMinerMechanic.ID))
                 .validate(registry.mechanicBindings());
         PaperRegionSafetyAdapter regionSafety = new PaperRegionSafetyAdapter();
         BukkitWorldMutationAdapter worldMutation = new BukkitWorldMutationAdapter(regionSafety);
@@ -75,10 +84,6 @@ public final class CustomContentPlugin extends JavaPlugin {
                 cooldowns,
                 scheduler,
                 regionSafety);
-AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerService(
-                registry.mechanicBindings(),
-                AreaBreakMechanic.ID,
-                areaBreakRuntime);
         VeinMinerRuntimeService veinMinerRuntime = new VeinMinerRuntimeService(
                 mechanicRegistry,
                 VeinMinerMechanic.ID,
@@ -89,10 +94,26 @@ AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerSe
                 cooldowns,
                 scheduler,
                 regionSafety);
+        MechanicRuntimeService mechanicRuntime = new MechanicRuntimeService(
+                mechanicRegistry,
+                registry,
+                blockStore,
+                dropPort,
+                worldMutation,
+                cooldowns,
+                scheduler,
+                regionSafety);
+        AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerService(
+                registry.mechanicBindings(),
+                AreaBreakMechanic.ID,
+                areaBreakRuntime);
         VeinMinerEventTriggerService veinMinerEventTrigger = new VeinMinerEventTriggerService(
                 registry.mechanicBindings(),
                 VeinMinerMechanic.ID,
                 veinMinerRuntime);
+        MechanicEventTriggerService mechanicTrigger = new MechanicEventTriggerService(
+                registry.mechanicBindings(),
+                mechanicRuntime);
         BukkitToolWearAdapter toolWear = new BukkitToolWearAdapter(registry, itemMetadata);
         MiningSessionService miningSessionService = new MiningSessionService(
                 new InMemoryMiningSessionRepository(),
@@ -104,7 +125,7 @@ AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerSe
                 worldMutation,
                 dropPort,
                 regionSafety,
-                areaBreakEventTrigger,
+                mechanicTrigger,
                 toolWear);
         MiningRuntimeProcessor miningRuntimeProcessor = new MiningRuntimeProcessor(
                 miningSessionService,

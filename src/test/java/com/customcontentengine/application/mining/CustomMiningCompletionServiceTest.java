@@ -5,8 +5,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
-import com.customcontentengine.application.mechanic.AreaBreakRuntimeService;
+import com.customcontentengine.application.mechanic.MechanicEventTriggerService;
+import com.customcontentengine.application.mechanic.MechanicRuntimeService;
 import com.customcontentengine.application.mechanic.MechanicRegistry;
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
 import com.customcontentengine.builtin.mechanic.AreaBreakMechanic;
@@ -45,7 +45,7 @@ class CustomMiningCompletionServiceTest {
         FakeBlockStore blockStore = new FakeBlockStore(Optional.of((short) 1));
         CapturingWorldMutation worldMutation = new CapturingWorldMutation();
         CapturingDropPort dropPort = new CapturingDropPort();
-        AreaBreakEventTriggerService triggerService = mock(AreaBreakEventTriggerService.class);
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
         CustomMiningCompletionService service = service(blockStore, worldMutation, dropPort, position -> true, triggerService);
 
         MiningCompletionPort.CompletionResult result = service.complete(request(TOOL_ID));
@@ -63,7 +63,7 @@ class CustomMiningCompletionServiceTest {
         FakeBlockStore blockStore = new FakeBlockStore(Optional.empty());
         CapturingWorldMutation worldMutation = new CapturingWorldMutation();
         CapturingDropPort dropPort = new CapturingDropPort();
-        AreaBreakEventTriggerService triggerService = mock(AreaBreakEventTriggerService.class);
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
         CustomMiningCompletionService service = service(blockStore, worldMutation, dropPort, position -> true, triggerService);
 
         MiningCompletionPort.CompletionResult result = service.complete(request(TOOL_ID));
@@ -80,7 +80,7 @@ class CustomMiningCompletionServiceTest {
         FakeBlockStore blockStore = new FakeBlockStore(Optional.of((short) 1));
         CapturingWorldMutation worldMutation = new CapturingWorldMutation();
         CapturingDropPort dropPort = new CapturingDropPort();
-        AreaBreakEventTriggerService triggerService = mock(AreaBreakEventTriggerService.class);
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
         CustomMiningCompletionService service = service(blockStore, worldMutation, dropPort, position -> false, triggerService);
 
         MiningCompletionPort.CompletionResult result = service.complete(request(TOOL_ID));
@@ -97,7 +97,7 @@ class CustomMiningCompletionServiceTest {
         FakeBlockStore blockStore = new FakeBlockStore(Optional.of((short) 1));
         CapturingWorldMutation worldMutation = new CapturingWorldMutation();
         CapturingDropPort dropPort = new CapturingDropPort();
-        AreaBreakEventTriggerService triggerService = mock(AreaBreakEventTriggerService.class);
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
         CustomMiningCompletionService service = service(blockStore, worldMutation, dropPort, position -> true, triggerService);
 
         MiningCompletionPort.CompletionResult result = service.complete(request(WRONG_TOOL_ID));
@@ -114,7 +114,7 @@ class CustomMiningCompletionServiceTest {
         FakeBlockStore blockStore = new FakeBlockStore(Optional.of((short) 1));
         CapturingWorldMutation worldMutation = new CapturingWorldMutation();
         CapturingDropPort dropPort = new CapturingDropPort();
-        AreaBreakEventTriggerService triggerService = mock(AreaBreakEventTriggerService.class);
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
         CustomMiningCompletionService service = service(blockStore, worldMutation, dropPort, position -> true, triggerService);
 
         MiningCompletionPort.CompletionResult first = service.complete(request(TOOL_ID));
@@ -135,19 +135,18 @@ class CustomMiningCompletionServiceTest {
         CapturingWorldMutation worldMutation = new CapturingWorldMutation();
         CapturingDropPort dropPort = new CapturingDropPort();
         DefinitionRegistry registry = registryWithAreaBreakBinding();
-        AreaBreakEventTriggerService triggerService = new AreaBreakEventTriggerService(
+        MechanicRuntimeService runtime = new MechanicRuntimeService(
+                new MechanicRegistry(List.of(new AreaBreakMechanic())),
+                registry,
+                blockStore,
+                dropPort,
+                worldMutation,
+                new InMemoryCooldowns(),
+                new ImmediateScheduler(),
+                position -> true);
+        MechanicEventTriggerService triggerService = new MechanicEventTriggerService(
                 registry.mechanicBindings(),
-                AreaBreakMechanic.ID,
-                new AreaBreakRuntimeService(
-                        new MechanicRegistry(List.of(new AreaBreakMechanic())),
-                        AreaBreakMechanic.ID,
-                        registry,
-                        blockStore,
-                        dropPort,
-                        worldMutation,
-                        new InMemoryCooldowns(),
-                        new ImmediateScheduler(),
-                        position -> true));
+                runtime);
         CustomMiningCompletionService service = new CustomMiningCompletionService(
                 registry,
                 blockStore,
@@ -173,7 +172,7 @@ class CustomMiningCompletionServiceTest {
             CapturingWorldMutation worldMutation,
             CapturingDropPort dropPort,
             RegionSafetyPort regionSafety,
-            AreaBreakEventTriggerService triggerService) {
+            MechanicEventTriggerService triggerService) {
         return new CustomMiningCompletionService(
                 registry(),
                 blockStore,

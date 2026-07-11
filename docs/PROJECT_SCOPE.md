@@ -1,7 +1,7 @@
 # Definitive Scope, Focus, and Boundaries Document — Evolutionary Implementation Version
 
 Project: CustomContent Engine  
-Version: 3.1.0 — Evolutionary scope refinements  
+Version: 3.2.0 — Evolutionary scope refinements (Tool Tiers official, BlockTransformMechanic)  
 Platform: Paper 1.21+ with Folia compatibility validated through technical spikes  
 Status: Approved as implementation scope with conservative evolutionary governance. Formal MVP freezing remains conditional on execution and validation of required technical spikes.
 
@@ -116,7 +116,19 @@ The scope freeze applies to the MVP implementation scope, not to the long-term p
 - Associate one or more mechanics with a tool through YAML definitions.
 - Create custom items through a debug command in the MVP.
 
-### 8.3 Mechanic Execution
+### 8.3 Tool Tiers (Official)
+
+Custom tools may declare a mining tier (`mining.tier`) and custom blocks may declare a required tier (`mining.required_tier`). Tiers are used to gate which tools can mine which blocks, providing a progression system.
+
+- `items.<id>.mining.tier` — optional positive integer. If absent, the tool does not participate in tier checks.
+- `blocks.<id>.mining.required_tier` — optional positive integer. If absent, the block has no tier restriction.
+- Tier validation occurs at mining session start. If the tool's tier is below the required tier, no session is created.
+- Held-item changes are re-validated and cancel the session if tier becomes insufficient.
+- Tiers are orthogonal to `mining.speed`, durability, and mechanics.
+- Tier logic is implemented in the mining application layer (`MiningSessionService.isTierEligible()`), not in mechanics.
+- This feature is **official** but not part of the stable core.
+
+### 8.4 Mechanic Execution
 
 - In the MVP, the only functional extension unit is the `Mechanic` interface.
 - Mechanics are behaviors triggered by interaction with a custom block, tool, or item.
@@ -126,7 +138,27 @@ The scope freeze applies to the MVP implementation scope, not to the long-term p
 - Mechanics return `MechanicResult`: `Done`, `Partial`, or `Rejected`.
 - Rescheduling is the responsibility of `MechanicExecutor`, not the mechanic.
 
-### 8.4 Flow Control
+### 8.5 BlockTransformMechanic (Official)
+
+`block_transform` is the second official builtin mechanic. It transforms a custom block at the execution origin into another block or material.
+
+Configuration in YAML:
+
+```yaml
+items:
+  ruby_pickaxe:
+    mechanics:
+      on_block_break:
+        - block_transform
+          arguments:
+            to_block: 42           # numeric_id of a custom block, or a material name like "stone"
+            drop_original: true    # optional, default false
+            consume_budget: true   # optional, default true
+```
+
+The mechanic requires the `MECHANIC_CONFIG` capability to read arguments. It is pure, stateless, and does not access Bukkit/Paper or services.
+
+### 8.6 Flow Control
 
 - Cooldown per player and per mechanic using a flat key structure and automatic expiration.
 - Work budget by explicit regional key, `RegionBudgetKey`, reset every region tick.
@@ -166,7 +198,7 @@ customcontent/
 │   ├── yaml/                    (YamlDefinitionLoader, YamlDefinitionValidator)
 │   └── bukkit/                  (Segmented listeners and commands)
 ├── builtin/                     (Official mechanics, not stable core)
-│   └── mechanic/                (AreaBreakMechanic)
+│   └── mechanic/                (AreaBreakMechanic, BlockTransformMechanic)
 ├── experimental/                (Optional incubating modules/contracts, not stable)
 ├── devtools/                    (Debug/profiling/test tools, disabled by default)
 └── bootstrap/                   (Composition Root — CustomContentPlugin)
@@ -299,6 +331,13 @@ Functional scope:
 9. 500ms cooldown per player per mechanic.
 10. `ProtectionPort` as an optional contract. If no adapter is implemented, only the original cancelled event is respected. Additional `area_break` blocks are processed according to safe policy defined by spike. Future implementation must not depend on fake Bukkit event simulation.
 
+### Post-MVP-3 — BlockTransformMechanic (Official)
+
+- Implemented `BlockTransformMechanic` as a builtin mechanic.
+- Added `BLOCK_PLACEMENT` and `MECHANIC_CONFIG` capabilities.
+- Supports arguments: `to_block`, `drop_original`, `consume_budget`.
+- Promoted to official status after demonstrating structural value.
+
 ### Confirmed Outside the MVP
 
 - Fortune, Silk Touch, and enchantments.
@@ -310,7 +349,7 @@ Functional scope:
 - ServiceLoader.
 - Stable public API for third parties.
 - Advanced Folia cross-region behavior.
-- `auto_smelt`, `vein_miner`, `block_transform`, or any second mechanic.
+- `auto_smelt`, `vein_miner`, or any third mechanic.
 - External database.
 - `SchedulerAccess` inside `MechanicContext`.
 - `runOnEntity` and `runAsync` in `SchedulerPort`.
@@ -578,10 +617,12 @@ Current or candidate core capabilities:
 
 - `BlockQuery`
 - `BlockMutation`
+- `BlockPlacement`
 - `BudgetView`
 - `CooldownView`
 - `DropSink`
 - `ExecutionOrigin`
+- `MechanicConfig`
 
 ### 24.2 Module Capabilities
 
@@ -754,7 +795,7 @@ Rules:
 
 ## Conditional Scope Freeze
 
-This document is version 3.1.0 of the scope and is approved as implementation scope with evolutionary governance.
+This document is version 3.2.0 of the scope and is approved as implementation scope with evolutionary governance.
 
 Formal MVP freezing is conditional on execution and validation of the required technical spikes.
 
@@ -790,7 +831,7 @@ Expected result: Confirmation or adjustment of capabilities available in `Mechan
 
 ## Freeze Rule
 
-After the three spikes are executed, documented, and approved, this document may be formally frozen as version `3.1.0-final` for MVP implementation.
+After the three spikes are executed, documented, and approved, this document may be formally frozen as version `3.2.0-final` for MVP implementation.
 
 This freezes the MVP implementation scope, not the long-term product vision.
 

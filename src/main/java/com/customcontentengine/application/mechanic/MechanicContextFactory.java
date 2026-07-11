@@ -4,6 +4,7 @@ import com.customcontentengine.internalapi.mechanic.Capability;
 import com.customcontentengine.internalapi.mechanic.MechanicContext;
 import com.customcontentengine.internalapi.mechanic.MechanicDescriptor;
 import com.customcontentengine.internalapi.mechanic.capability.BlockMutation;
+import com.customcontentengine.internalapi.mechanic.capability.BlockPlacement;
 import com.customcontentengine.internalapi.mechanic.capability.BlockQuery;
 import com.customcontentengine.internalapi.mechanic.capability.BudgetView;
 import com.customcontentengine.internalapi.mechanic.capability.CooldownView;
@@ -11,6 +12,7 @@ import com.customcontentengine.internalapi.mechanic.capability.DropSink;
 import com.customcontentengine.internalapi.mechanic.capability.EnchantmentView;
 import com.customcontentengine.internalapi.mechanic.capability.ExecutionOrigin;
 import com.customcontentengine.internalapi.mechanic.capability.MechanicArguments;
+import com.customcontentengine.internalapi.mechanic.capability.MechanicConfig;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -83,12 +85,14 @@ public final class MechanicContextFactory {
         Map<Capability, Class<?>> types = new EnumMap<>(Capability.class);
         types.put(Capability.BLOCK_QUERY, BlockQuery.class);
         types.put(Capability.BLOCK_MUTATION, BlockMutation.class);
+        types.put(Capability.BLOCK_PLACEMENT, BlockPlacement.class);
         types.put(Capability.BUDGET_VIEW, BudgetView.class);
         types.put(Capability.COOLDOWN_VIEW, CooldownView.class);
         types.put(Capability.DROP_SINK, DropSink.class);
         types.put(Capability.EXECUTION_ORIGIN, ExecutionOrigin.class);
         types.put(Capability.ENCHANTMENT_VIEW, EnchantmentView.class);
         types.put(Capability.MECHANIC_ARGUMENTS, MechanicArguments.class);
+        types.put(Capability.MECHANIC_CONFIG, MechanicConfig.class);
         return Map.copyOf(types);
     }
 

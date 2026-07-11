@@ -95,9 +95,9 @@ Allowed MVP-1 work only after MVP-0 is stable:
 
 Do not implement in the MVP unless an ADR explicitly changes the milestone:
 
-- `vein_miner` (authorized as an official module by ADR-0011; see note below);
+ - `vein_miner` (authorized as an official module by ADR-0011; see note below);
 - `block_transform`;
-- `auto_smelt`;
+ - `auto_smelt`;
 - second or third gameplay mechanic beyond the approved MVP-1 mechanic;
 - Fortune (authorized for `vein_miner` only via the `ENCHANTMENT_VIEW` module capability, ADR-0011);
 - Silk Touch (authorized for `vein_miner` only via the `ENCHANTMENT_VIEW` module capability, ADR-0011);
@@ -173,6 +173,7 @@ Official modules are maintained by the project but are not automatically part of
 Examples:
 
 - `area_break` mechanic;
+- `block_transform` mechanic;
 - future official mechanics;
 - debug/dev tooling;
 - optional integration modules.
@@ -451,6 +452,8 @@ When introduced:
 - mechanics must not call third-party plugin APIs directly;
 - mechanics must not perform disk or network I/O during execution;
 - mechanics must not ignore `WorkBudget` when processing multiple blocks.
+- Mechanics may request the `MECHANIC_CONFIG` capability to receive YAML arguments. Arguments are pure data; mechanics must not use them to access services or platform APIs.
+- The `block_transform` mechanic is an official implementation that uses `MECHANIC_CONFIG`, `BLOCK_PLACEMENT`, and `BLOCK_MUTATION`. It remains pure and stateless.
 
 ### Official Mechanics
 
@@ -484,10 +487,12 @@ Examples:
 
 - `BlockQuery`;
 - `BlockMutation`;
+- `BlockPlacement`;
 - `BudgetView`;
 - `CooldownView`;
 - `DropSink`;
-- `ExecutionOrigin`.
+- `ExecutionOrigin`;
+- `MechanicConfig`.
 
 ### 14.2 Module Capabilities
 
@@ -521,6 +526,16 @@ The following must not become stable core capabilities:
 - generic scripting;
 - generic permission framework;
 - direct WorldGuard or GriefPrevention APIs.
+
+### 14.4 Tool Tiers (Official)
+
+Tool tiers are a property of the mining domain, not a mechanic capability. They are implemented in the application layer (`MiningSessionService`) and validated before a mining session is created. Tiers are orthogonal to mechanics and do not affect `MechanicContext`.
+
+### 14.5 Context Anti-God-Object Rule
+
+`MechanicContext` must not become a service locator for the entire plugin.
+
+A capability is not allowed merely because it is convenient. It must be justified by scope, safety, testability, and reuse.
 
 ---
 

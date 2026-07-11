@@ -4,7 +4,6 @@ import com.customcontentengine.domain.definition.BlockDef;
 import com.customcontentengine.domain.definition.DropTable;
 import com.customcontentengine.domain.definition.ItemDef;
 import com.customcontentengine.domain.definition.ToolAttributes;
-import com.customcontentengine.domain.durability.ToolBreakPolicy;
 import com.customcontentengine.domain.durability.ToolDurabilityDefinition;
 import com.customcontentengine.domain.mechanic.MechanicBinding;
 import com.customcontentengine.domain.mechanic.MechanicBindingRegistry;
@@ -83,7 +82,7 @@ public final class YamlDefinitionLoader {
         return drops;
     }
 
-private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
+    private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
         List<ItemDef> items = new ArrayList<>();
         for (String id : itemsSection.getKeys(false)) {
             ConfigurationSection section = itemsSection.getConfigurationSection(id);
@@ -167,26 +166,25 @@ private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
             CustomItemId itemId = itemId(id);
             for (String triggerKey : mechanics.getKeys(false)) {
                 MechanicTrigger trigger = mechanicTrigger(id, triggerKey);
-                List<?> mechanicIds = mechanics.getList(triggerKey);
-                for (int index = 0; index < mechanicIds.size(); index++) {
-                    Object raw = mechanicIds.get(index);
-                    if (raw instanceof String idValue) {
+                List<?> mechanicEntries = mechanics.getList(triggerKey);
+                if (mechanicEntries == null || mechanicEntries.isEmpty()) {
+                    throw new YamlDefinitionException("Invalid definitions.yml: items." + id
+                            + ".mechanics." + triggerKey + " must contain at least one mechanic id");
+                }
+                for (int index = 0; index < mechanicEntries.size(); index++) {
+                    Object entry = mechanicEntries.get(index);
+                    if (entry instanceof String mechanicIdStr) {
                         bindings.add(new MechanicBinding(
                                 itemId,
                                 trigger,
-                                mechanicId(id, triggerKey, index, idValue)));
-                    } else if (raw instanceof Map<?, ?> entry) {
-                        Object rawId = entry.get("id");
-                        if (!(rawId instanceof String idValue)) {
-                            throw new YamlDefinitionException("Invalid definitions.yml: items." + id
-                                    + ".mechanics." + triggerKey + "[" + index + "] requires an 'id' string");
-                        }
-                        Map<String, Object> arguments = loadArguments(entry.get("arguments"));
+                                mechanicId(id, triggerKey, index, mechanicIdStr)));
+                    } else if (entry instanceof Map<?, ?> mechanicMap) {
+                        ParsedMechanic parsed = parseMechanicMap(id, triggerKey, index, mechanicMap);
                         bindings.add(new MechanicBinding(
                                 itemId,
                                 trigger,
-                                mechanicId(id, triggerKey, index, idValue),
-                                arguments));
+                                mechanicId(id, triggerKey, index, parsed.mechanicId),
+                                parsed.arguments));
                     } else {
                         throw new YamlDefinitionException("Invalid definitions.yml: items." + id
                                 + ".mechanics." + triggerKey + "[" + index + "] must be a string or a map");
@@ -195,6 +193,29 @@ private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
             }
         }
         return new MechanicBindingRegistry(bindings);
+    }
+
+    private ParsedMechanic parseMechanicMap(String itemId, String triggerKey, int index, Map<?, ?> mechanicMap) {
+        Object rawId = mechanicMap.get("id");
+        if (rawId instanceof String mechanicId) {
+            Map<String, Object> arguments = loadArguments(mechanicMap.get("arguments"));
+            return new ParsedMechanic(mechanicId, arguments);
+        }
+        String mechanicId = null;
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> mapEntry : mechanicMap.entrySet()) {
+            String key = mapEntry.getKey().toString();
+            if (mechanicId == null) {
+                mechanicId = key;
+            } else {
+                arguments.put(key, mapEntry.getValue());
+            }
+        }
+        if (mechanicId == null) {
+            throw new YamlDefinitionException("Invalid definitions.yml: items." + itemId
+                    + ".mechanics." + triggerKey + "[" + index + "] is missing mechanic id");
+        }
+        return new ParsedMechanic(mechanicId, arguments);
     }
 
     private Map<String, Object> loadArguments(Object raw) {
@@ -210,6 +231,8 @@ private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
         }
         return result;
     }
+
+    private record ParsedMechanic(String mechanicId, Map<String, Object> arguments) { }
 
     private CustomBlockId blockId(String id) {
         try {
