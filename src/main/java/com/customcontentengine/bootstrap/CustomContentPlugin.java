@@ -11,11 +11,12 @@ import com.customcontentengine.adapter.bukkit.BukkitToolWearAdapter;
 import com.customcontentengine.adapter.bukkit.ItemCommandAdapter;
 import com.customcontentengine.adapter.bukkit.MiningInputAdapter;
 import com.customcontentengine.adapter.bukkit.MiningProcessingDriver;
-import com.customcontentengine.adapter.platform.PaperRegionSafetyAdapter;
-import com.customcontentengine.adapter.platform.PaperSchedulerAdapter;
-import com.customcontentengine.adapter.platform.PaperPeriodicSchedulerAdapter;
+import com.customcontentengine.adapter.bukkit.VeinMinerToggleCommandAdapter;
 import com.customcontentengine.adapter.persistence.PdcBlockCodec;
 import com.customcontentengine.adapter.persistence.PdcBlockStore;
+import com.customcontentengine.adapter.platform.PaperPeriodicSchedulerAdapter;
+import com.customcontentengine.adapter.platform.PaperRegionSafetyAdapter;
+import com.customcontentengine.adapter.platform.PaperSchedulerAdapter;
 import com.customcontentengine.adapter.yaml.YamlDefinitionLoader;
 import com.customcontentengine.adapter.yaml.YamlDefinitionValidator;
 import com.customcontentengine.application.block.BlockService;
@@ -26,6 +27,7 @@ import com.customcontentengine.application.mechanic.MechanicBindingValidator;
 import com.customcontentengine.application.mechanic.MechanicEventTriggerService;
 import com.customcontentengine.application.mechanic.MechanicRegistry;
 import com.customcontentengine.application.mechanic.MechanicRuntimeService;
+import com.customcontentengine.application.mechanic.PlayerPreferenceService;
 import com.customcontentengine.application.mechanic.VeinMinerEventTriggerService;
 import com.customcontentengine.application.mechanic.VeinMinerRuntimeService;
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
@@ -59,6 +61,8 @@ public final class CustomContentPlugin extends JavaPlugin {
         BukkitItemMetadataAdapter itemMetadata = new BukkitItemMetadataAdapter(this);
         ItemService<ItemStack> itemService = new ItemService<>(registry, itemMetadata);
         BukkitDropAdapter dropPort = new BukkitDropAdapter(itemService);
+        BukkitToolWearAdapter toolWear = new BukkitToolWearAdapter(registry, itemMetadata);
+        PlayerPreferenceService playerPreferences = new PlayerPreferenceService();
         BlockService blockService = new BlockService(registry, blockStore, dropPort);
         MechanicRegistry mechanicRegistry = new MechanicRegistry(List.of(
                 new AreaBreakMechanic(),
@@ -93,7 +97,9 @@ public final class CustomContentPlugin extends JavaPlugin {
                 worldMutation,
                 cooldowns,
                 scheduler,
-                regionSafety);
+                regionSafety,
+                toolWear,
+                null);
         MechanicRuntimeService mechanicRuntime = new MechanicRuntimeService(
                 mechanicRegistry,
                 registry,
@@ -110,11 +116,11 @@ public final class CustomContentPlugin extends JavaPlugin {
         VeinMinerEventTriggerService veinMinerEventTrigger = new VeinMinerEventTriggerService(
                 registry.mechanicBindings(),
                 VeinMinerMechanic.ID,
-                veinMinerRuntime);
+                veinMinerRuntime,
+                playerPreferences);
         MechanicEventTriggerService mechanicTrigger = new MechanicEventTriggerService(
                 registry.mechanicBindings(),
                 mechanicRuntime);
-        BukkitToolWearAdapter toolWear = new BukkitToolWearAdapter(registry, itemMetadata);
         MiningSessionService miningSessionService = new MiningSessionService(
                 new InMemoryMiningSessionRepository(),
                 MiningDurationPolicy.DEFAULT);
@@ -155,6 +161,11 @@ public final class CustomContentPlugin extends JavaPlugin {
         PluginCommand areaBreakDebugCommand = getCommand("debugareabreak");
         if (areaBreakDebugCommand != null) {
             areaBreakDebugCommand.setExecutor(new AreaBreakDebugCommandAdapter(areaBreakRuntime));
+        }
+
+        PluginCommand veinMinerToggleCommand = getCommand("veinminertoggle");
+        if (veinMinerToggleCommand != null) {
+            veinMinerToggleCommand.setExecutor(new VeinMinerToggleCommandAdapter(playerPreferences));
         }
     }
 
