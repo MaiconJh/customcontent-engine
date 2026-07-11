@@ -10,6 +10,7 @@ import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.internalapi.mechanic.Capability;
 import com.customcontentengine.internalapi.mechanic.MechanicContext;
 import com.customcontentengine.internalapi.mechanic.MechanicResult;
+import com.customcontentengine.internalapi.mechanic.capability.ActorState;
 import com.customcontentengine.internalapi.mechanic.capability.EnchantmentView;
 import com.customcontentengine.internalapi.mechanic.capability.MechanicArguments;
 import com.customcontentengine.internalapi.mechanic.capability.BlockMutation;
@@ -183,6 +184,87 @@ class VeinMinerMechanicTest {
         new VeinMinerMechanic().execute(ctx);
 
         assertEquals(9, dropSink.totalDropped());
+    }
+
+    @Test
+    void rejectsWhenRequireSneakAndNotSneaking() {
+        Map<String, Object> arguments = Map.of("require_sneak", true);
+        Map<Class<?>, Object> capabilities = new HashMap<>();
+        capabilities.put(BlockQuery.class, new FakeBlockQueryFor(3));
+        capabilities.put(BlockMutation.class, (BlockMutation) pos -> {});
+        capabilities.put(BudgetView.class, (BudgetView) pos -> true);
+        capabilities.put(CooldownView.class, (CooldownView) () -> true);
+        capabilities.put(DropSink.class, (DropSink) (pos, id) -> {});
+        capabilities.put(ExecutionOrigin.class, (ExecutionOrigin) () -> ORIGIN);
+        capabilities.put(ActorState.class, (ActorState) () -> false);
+        capabilities.put(MechanicArguments.class, new FakeMechanicArguments(arguments));
+        MechanicContext ctx = new MechanicContextFactory(capabilities)
+                .createContext(new VeinMinerMechanic().descriptor());
+
+        MechanicResult result = new VeinMinerMechanic().execute(ctx);
+
+        MechanicResult.Rejected rejected = assertInstanceOf(MechanicResult.Rejected.class, result);
+        assertTrue(rejected.reason().contains("sneaking"));
+    }
+
+    @Test
+    void executesWhenRequireSneakAndSneaking() {
+        Map<String, Object> arguments = Map.of("require_sneak", true);
+        Map<Class<?>, Object> capabilities = new HashMap<>();
+        capabilities.put(BlockQuery.class, new FakeBlockQueryFor(3));
+        capabilities.put(BlockMutation.class, (BlockMutation) pos -> {});
+        capabilities.put(BudgetView.class, (BudgetView) pos -> true);
+        capabilities.put(CooldownView.class, (CooldownView) () -> true);
+        capabilities.put(DropSink.class, (DropSink) (pos, id) -> {});
+        capabilities.put(ExecutionOrigin.class, (ExecutionOrigin) () -> ORIGIN);
+        capabilities.put(ActorState.class, (ActorState) () -> true);
+        capabilities.put(MechanicArguments.class, new FakeMechanicArguments(arguments));
+        MechanicContext ctx = new MechanicContextFactory(capabilities)
+                .createContext(new VeinMinerMechanic().descriptor());
+
+        MechanicResult result = new VeinMinerMechanic().execute(ctx);
+
+        MechanicResult.Done done = assertInstanceOf(MechanicResult.Done.class, result);
+        assertEquals(3, done.affectedBlocks());
+    }
+
+    @Test
+    void rejectsWhenRequireSneakButActorStateUnavailable() {
+        Map<String, Object> arguments = Map.of("require_sneak", true);
+        Map<Class<?>, Object> capabilities = new HashMap<>();
+        capabilities.put(BlockQuery.class, new FakeBlockQueryFor(3));
+        capabilities.put(BlockMutation.class, (BlockMutation) pos -> {});
+        capabilities.put(BudgetView.class, (BudgetView) pos -> true);
+        capabilities.put(CooldownView.class, (CooldownView) () -> true);
+        capabilities.put(DropSink.class, (DropSink) (pos, id) -> {});
+        capabilities.put(ExecutionOrigin.class, (ExecutionOrigin) () -> ORIGIN);
+        capabilities.put(MechanicArguments.class, new FakeMechanicArguments(arguments));
+        MechanicContext ctx = new MechanicContextFactory(capabilities)
+                .createContext(new VeinMinerMechanic().descriptor());
+
+        MechanicResult result = new VeinMinerMechanic().execute(ctx);
+
+        assertInstanceOf(MechanicResult.Rejected.class, result);
+    }
+
+    @Test
+    void clampsLimitsForAllAdjacentShape() {
+        Map<String, Object> arguments = Map.of("shape", "ALL_ADJACENT", "max_blocks", 512, "max_depth", 64);
+        Map<Class<?>, Object> capabilities = new HashMap<>();
+        capabilities.put(BlockQuery.class, new FakeBlockQueryFor(40));
+        capabilities.put(BlockMutation.class, (BlockMutation) pos -> {});
+        capabilities.put(BudgetView.class, (BudgetView) pos -> true);
+        capabilities.put(CooldownView.class, (CooldownView) () -> true);
+        capabilities.put(DropSink.class, (DropSink) (pos, id) -> {});
+        capabilities.put(ExecutionOrigin.class, (ExecutionOrigin) () -> ORIGIN);
+        capabilities.put(MechanicArguments.class, new FakeMechanicArguments(arguments));
+        MechanicContext ctx = new MechanicContextFactory(capabilities)
+                .createContext(new VeinMinerMechanic().descriptor());
+
+        MechanicResult result = new VeinMinerMechanic().execute(ctx);
+
+        MechanicResult.Done done = assertInstanceOf(MechanicResult.Done.class, result);
+        assertEquals(11, done.affectedBlocks());
     }
 
     private static final class CountingDropSink implements DropSink {

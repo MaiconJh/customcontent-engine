@@ -8,9 +8,11 @@ import com.customcontentengine.application.mechanic.capability.StoredBlockMutati
 import com.customcontentengine.application.mechanic.capability.StoredBlockQuery;
 import com.customcontentengine.application.mechanic.capability.WorkBudgetView;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
+import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.internalapi.mechanic.MechanicId;
 import com.customcontentengine.internalapi.mechanic.MechanicResult;
+import com.customcontentengine.internalapi.mechanic.capability.ActorState;
 import com.customcontentengine.internalapi.mechanic.capability.BlockMutation;
 import com.customcontentengine.internalapi.mechanic.capability.BlockQuery;
 import com.customcontentengine.internalapi.mechanic.capability.BudgetView;
@@ -21,8 +23,10 @@ import com.customcontentengine.internalapi.mechanic.capability.ExecutionOrigin;
 import com.customcontentengine.internalapi.mechanic.capability.MechanicArguments;
 import com.customcontentengine.port.BlockStorePort;
 import com.customcontentengine.port.DropPort;
+import com.customcontentengine.port.ProtectionPort;
 import com.customcontentengine.port.RegionSafetyPort;
 import com.customcontentengine.port.SchedulerPort;
+import com.customcontentengine.port.ToolWearPort;
 import com.customcontentengine.port.WorldMutationPort;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -32,18 +36,26 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Logger;
 
 /**
  * Runtime service that executes the {@code vein_miner} official mechanic.
  *
  * <p>Follows the same Folia-safe pattern as {@link AreaBreakRuntimeService}:
- * synchronous processing with {@link WorkBudget} and {@link com.customcontentengine.internalapi.mechanic.MechanicResult.Partial}
- * rescheduling. The {@link EnchantmentView} capability (when provided) lets the
- * mechanic apply Fortune/Silk Touch without depending on Bukkit types.</p>
+ * synchronous processing with {@link WorkBudget} and {@link MechanicResult.Partial}
+ * rescheduling. The {@link EnchantmentView} and {@link ActorState} capabilities
+ * (when provided) let the mechanic apply Fortune/Silk Touch and react to the
+ * actor's sneaking state without depending on Bukkit types.</p>
+ *
+ * <p>After execution, per-block tool wear is applied via {@link ToolWearPort}
+ * when {@code durability_per_block} is enabled, and block queries are hidden
+ * behind {@link ProtectionPort} so protected blocks are skipped without being
+ * counted or mutated.</p>
  */
 public final class VeinMinerRuntimeService {
     private static final int VEIN_MINER_BUDGET = 64;
     private static final long COOLDOWN_MILLIS = 500L;
+    private static final Logger LOGGER = Logger.getLogger(VeinMinerRuntimeService.class.getName());
 
     private final MechanicRegistry mechanicRegistry;
     private final MechanicId mechanicId;
@@ -54,6 +66,8 @@ public final class VeinMinerRuntimeService {
     private final InMemoryCooldowns cooldowns;
     private final SchedulerPort schedulerPort;
     private final RegionSafetyPort regionSafety;
+    private final ToolWearPort toolWearPort;
+    private final ProtectionPort protectionPort;
 
     public VeinMinerRuntimeService(
             MechanicRegistry mechanicRegistry,
@@ -64,7 +78,9 @@ public final class VeinMinerRuntimeService {
             WorldMutationPort worldMutation,
             InMemoryCooldowns cooldowns,
             SchedulerPort schedulerPort,
-            RegionSafetyPort regionSafety) {
+            RegionSafetyPort regionSafety,
+            ToolWearPort toolWearPort,
+            ProtectionPort protectionPort) {
         this.mechanicRegistry = Objects.requireNonNull(mechanicRegistry, "mechanicRegistry");
         this.mechanicId = Objects.requireNonNull(mechanicId, "mechanicId");
         this.definitions = Objects.requireNonNull(definitions, "definitions");
@@ -74,12 +90,16 @@ public final class VeinMinerRuntimeService {
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.schedulerPort = Objects.requireNonNull(schedulerPort, "schedulerPort");
         this.regionSafety = Objects.requireNonNull(regionSafety, "regionSafety");
+        this.toolWearPort = toolWearPort;
+        this.protectionPort = protectionPort;
     }
 
     public MechanicResult execute(
             WorldPosition origin,
             String actorKey,
+            CustomItemId toolId,
             EnchantmentView enchantmentView,
+            ActorState actorState,
             Map<String, Object> arguments) {
         Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(actorKey, "actorKey");
@@ -87,18 +107,66 @@ public final class VeinMinerRuntimeService {
             throw new IllegalArgumentException("actorKey must not be blank");
         }
 
+        if (isAllAdjacent(arguments)) {
+            LOGGER.info(() -> "vein_miner using ALL_ADJACENT shape: applying conservative limits "
+                    + "(max_blocks <= 32, max_depth <= 10) to protect TPS.");
+        }
+
         RegionSafetyTracker safetyTracker = new RegionSafetyTracker(regionSafety);
         MechanicContextFactory contextFactory = contextFactory(
-                origin, actorKey, true, safetyTracker, enchantmentView, arguments);
+                origin, actorKey, true, safetyTracker, enchantmentView, actorState, arguments);
         MechanicResult result = new MechanicExecutor(
                 mechanicRegistry,
                 contextFactory,
                 schedulerPort,
                 anchor -> contextFactory(
-                        anchor, actorKey, false, new RegionSafetyTracker(regionSafety), enchantmentView, arguments),
+                        anchor, actorKey, false, new RegionSafetyTracker(regionSafety),
+                        enchantmentView, actorState, arguments),
                 8)
                 .execute(mechanicId);
-        return safetyTracker.apply(result);
+        MechanicResult applied = safetyTracker.apply(result);
+        applyDurability(applied, actorKey, toolId, arguments);
+        return applied;
+    }
+
+    private void applyDurability(
+            MechanicResult result,
+            String actorKey,
+            CustomItemId toolId,
+            Map<String, Object> arguments) {
+        if (toolWearPort == null || toolId == null) {
+            return;
+        }
+        int affected;
+        if (result instanceof MechanicResult.Done done) {
+            affected = done.affectedBlocks();
+        } else if (result instanceof MechanicResult.Partial partial) {
+            affected = partial.affectedBlocks();
+        } else {
+            return;
+        }
+        if (affected <= 0) {
+            return;
+        }
+        boolean perBlock = durabilityPerBlock(arguments);
+        int count = perBlock ? affected : 1;
+        toolWearPort.applyWearIfNeeded(actorKey, toolId, count);
+    }
+
+    private boolean durabilityPerBlock(Map<String, Object> arguments) {
+        if (arguments == null) {
+            return true;
+        }
+        Object value = arguments.get("durability_per_block");
+        return value == null || Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    private boolean isAllAdjacent(Map<String, Object> arguments) {
+        if (arguments == null) {
+            return false;
+        }
+        Object value = arguments.get("shape");
+        return value != null && "ALL_ADJACENT".equalsIgnoreCase(String.valueOf(value));
     }
 
     private MechanicContextFactory contextFactory(
@@ -107,9 +175,10 @@ public final class VeinMinerRuntimeService {
             boolean initialExecution,
             RegionSafetyTracker safetyTracker,
             EnchantmentView enchantmentView,
+            ActorState actorState,
             Map<String, Object> arguments) {
         Map<Class<?>, Object> capabilities = new LinkedHashMap<>();
-        capabilities.put(BlockQuery.class, blockQuery(safetyTracker));
+        capabilities.put(BlockQuery.class, blockQuery(safetyTracker, actorKey));
         capabilities.put(BlockMutation.class, blockMutation(safetyTracker));
         capabilities.put(BudgetView.class, new WorkBudgetView(new WorkBudget(VEIN_MINER_BUDGET)));
         capabilities.put(CooldownView.class, cooldownView(actorKey, initialExecution));
@@ -117,6 +186,9 @@ public final class VeinMinerRuntimeService {
         capabilities.put(ExecutionOrigin.class, new StaticExecutionOrigin(origin));
         if (enchantmentView != null) {
             capabilities.put(EnchantmentView.class, enchantmentView);
+        }
+        if (actorState != null) {
+            capabilities.put(ActorState.class, actorState);
         }
         if (arguments != null && !arguments.isEmpty()) {
             capabilities.put(MechanicArguments.class, new MapBackedMechanicArguments(arguments));
@@ -142,10 +214,13 @@ public final class VeinMinerRuntimeService {
         }
     }
 
-    private BlockQuery blockQuery(RegionSafetyTracker safetyTracker) {
+    private BlockQuery blockQuery(RegionSafetyTracker safetyTracker, String actorKey) {
         BlockQuery delegate = new StoredBlockQuery(blockStore);
         return position -> {
             if (!safetyTracker.canAccess(position)) {
+                return Optional.empty();
+            }
+            if (protectionPort != null && !protectionPort.canBuild(actorKey, position)) {
                 return Optional.empty();
             }
             return delegate.findCustomBlockNumericId(position);

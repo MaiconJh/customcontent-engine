@@ -10,3 +10,6 @@ commands:
   debugareabreak:
     description: Internal debug command to execute area_break against the targeted block.
     usage: /debugareabreak
+  veinminertoggle:
+    description: Toggle the vein_miner mechanic for the calling player.
+    usage: /veinminertoggle

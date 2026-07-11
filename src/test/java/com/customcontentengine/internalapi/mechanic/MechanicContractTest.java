@@ -76,8 +76,9 @@ class MechanicContractTest {
                 Capability.EXECUTION_ORIGIN,
                 Capability.ENCHANTMENT_VIEW,
                 Capability.MECHANIC_ARGUMENTS,
-                Capability.MECHANIC_CONFIG
+                Capability.MECHANIC_CONFIG,
+                Capability.ACTOR_STATE
         )));
-        assertEquals(10, Capability.values().length);
+        assertEquals(11, Capability.values().length);
     }
 }

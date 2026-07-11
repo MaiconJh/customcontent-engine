@@ -10,6 +10,7 @@ import com.customcontentengine.internalapi.mechanic.capability.BudgetView;
 import com.customcontentengine.internalapi.mechanic.capability.CooldownView;
 import com.customcontentengine.internalapi.mechanic.capability.DropSink;
 import com.customcontentengine.internalapi.mechanic.capability.EnchantmentView;
+import com.customcontentengine.internalapi.mechanic.capability.ActorState;
 import com.customcontentengine.internalapi.mechanic.capability.ExecutionOrigin;
 import com.customcontentengine.internalapi.mechanic.capability.MechanicArguments;
 import com.customcontentengine.internalapi.mechanic.capability.MechanicConfig;
@@ -93,6 +94,7 @@ public final class MechanicContextFactory {
         types.put(Capability.ENCHANTMENT_VIEW, EnchantmentView.class);
         types.put(Capability.MECHANIC_ARGUMENTS, MechanicArguments.class);
         types.put(Capability.MECHANIC_CONFIG, MechanicConfig.class);
+        types.put(Capability.ACTOR_STATE, ActorState.class);
         return Map.copyOf(types);
     }
 

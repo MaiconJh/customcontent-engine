@@ -4,7 +4,7 @@ import org.gradle.jvm.tasks.Jar
 
 plugins {
     java
-    id("me.champeau.jmh") version "0.7.2"  // JMH plugin for microbenchmarks
+    id("me.champeau.jmh") version "0.7.2"  // JMH plugin
 }
 
 group = "com.customcontentengine"
@@ -38,13 +38,6 @@ val integrationTest by sourceSets.creating {
 val spike by sourceSets.creating {
     java.srcDir("src/spike/java")
     compileClasspath += sourceSets.main.get().output
-    runtimeClasspath += output + compileClasspath
-}
-
-// JMH source set – benchmarks go in src/jmh/java
-val jmh by sourceSets.creating {
-    java.srcDir("src/jmh/java")
-    compileClasspath += sourceSets.main.get().output + sourceSets.spike.get().output
     runtimeClasspath += output + compileClasspath
 }
 
@@ -122,7 +115,7 @@ tasks.register<Test>("integrationTest") {
     }
 }
 
-// ========== SPIKE TASKS (manual benchmarks) ==========
+// ========== SPIKE TASKS ==========
 
 tasks.register<JavaExec>("binaryPdcSpike") {
     description = "Runs Spike 1 binary PDC codec performance measurements."
@@ -147,41 +140,25 @@ tasks.register<JavaExec>("veinMinerSpike") {
 // ========== JMH CONFIGURATION ==========
 
 jmh {
-    // Use the dedicated JMH source set
-    sourceSets = setOf(jmh)
-
-    // Benchmark parameters
+    // JMH will automatically create a 'jmh' source set – no need to define it manually.
+    // The following options are supported:
     warmupIterations.set(5)          // Number of warmup iterations
     iterations.set(10)               // Number of measurement iterations
-    fork.set(2)                      // Number of JVM forks (2 for statistical confidence)
-    timeOnIteration.set("1s")        // Time per iteration (1 second per iteration)
-    warmupTimeOnIteration.set("1s")  // Warmup time per iteration
-    timeUnit.set("us")               // Output time unit (microseconds)
+    fork.set(2)                      // Number of JVM forks
+    timeOnIteration.set("1s")        // Time per iteration
+    // timeUnit is not a direct property; we set it via @OutputTimeUnit in the benchmark class.
     resultFormat.set("JSON")         // Output format (CSV, JSON, TEXT)
     resultsFile.set(layout.buildDirectory.file("reports/jmh/results.json"))
     includeTests.set(false)          // Don't run tests as benchmarks
-    jmhVersion.set("1.37")           // JMH version (override default if needed)
+    jmhVersion.set("1.37")           // JMH version (optional, uses latest if omitted)
 }
 
-// Optional: task to run JMH benchmarks specifically
-tasks.register<JavaExec>("jmhRun") {
-    description = "Runs JMH benchmarks using the JMH plugin configuration."
-    group = "benchmark"
-    dependsOn(tasks.named("jmh"))
-    // The 'jmh' task is automatically created by the plugin
-    // This just provides a convenient alias
-}
+// Optional: task to run JMH benchmarks explicitly (already provided by the plugin)
+// You can run: ./gradlew jmh
 
-// ========== CONFIGURATION FOR JMH SOURCE SET ==========
+// ========== CONVENIENCE TASK ==========
 
-// Ensure JMH dependencies include spike classes
-configurations[jmh.implementationConfigurationName].extendsFrom(configurations.spike.implementationConfigurationName.get())
-configurations[jmh.runtimeOnlyConfigurationName].extendsFrom(configurations.spike.runtimeOnlyConfigurationName.get())
-
-// ========== OTHER TASKS ==========
-
-// If you want to run all checks (test, integrationTest, jmh) together:
 tasks.register("checkAll") {
-    dependsOn(tasks.test, tasks.integrationTest, tasks.jmh)
-    description = "Runs all tests and JMH benchmarks."
+    dependsOn(tasks.named("test"), tasks.named("integrationTest"), tasks.named("jmh"))
+    description = "Runs all tests, integration tests, and JMH benchmarks."
 }

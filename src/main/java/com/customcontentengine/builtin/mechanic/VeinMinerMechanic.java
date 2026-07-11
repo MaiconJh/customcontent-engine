@@ -12,6 +12,7 @@ import com.customcontentengine.internalapi.mechanic.capability.BlockQuery;
 import com.customcontentengine.internalapi.mechanic.capability.BudgetView;
 import com.customcontentengine.internalapi.mechanic.capability.CooldownView;
 import com.customcontentengine.internalapi.mechanic.capability.DropSink;
+import com.customcontentengine.internalapi.mechanic.capability.ActorState;
 import com.customcontentengine.internalapi.mechanic.capability.EnchantmentView;
 import com.customcontentengine.internalapi.mechanic.capability.ExecutionOrigin;
 import com.customcontentengine.internalapi.mechanic.capability.MechanicArguments;
@@ -31,6 +32,8 @@ public final class VeinMinerMechanic implements Mechanic {
     private static final int DEFAULT_MAX_DEPTH = 20;
     private static final int ABSOLUTE_MAX_BLOCKS = 512;
     private static final int HARD_MAX_DEPTH = 64;
+    private static final int ALL_ADJACENT_MAX_BLOCKS = 32;
+    private static final int ALL_ADJACENT_MAX_DEPTH = 10;
 
     private static final MechanicDescriptor DESCRIPTOR = new MechanicDescriptor(ID, Set.of(
             Capability.BLOCK_QUERY,
@@ -39,7 +42,10 @@ public final class VeinMinerMechanic implements Mechanic {
             Capability.COOLDOWN_VIEW,
             Capability.DROP_SINK,
             Capability.EXECUTION_ORIGIN
-    ), false, Set.of(Capability.ENCHANTMENT_VIEW, Capability.MECHANIC_ARGUMENTS));
+    ), false, Set.of(
+            Capability.ENCHANTMENT_VIEW,
+            Capability.MECHANIC_ARGUMENTS,
+            Capability.ACTOR_STATE));
 
     private final int defaultMaxBlocks;
     private final int defaultMaxDepth;
@@ -101,6 +107,17 @@ public final class VeinMinerMechanic implements Mechanic {
             return new MechanicResult.Rejected("Cooldown rejected vein_miner");
         }
 
+        boolean requireSneak = resolveBoolean(arguments, "require_sneak", false);
+        Optional<ActorState> actorState = context.optional(ActorState.class);
+        if (requireSneak) {
+            if (actorState.isEmpty()) {
+                return new MechanicResult.Rejected("require_sneak enabled but actor state unavailable");
+            }
+            if (!actorState.get().isSneaking()) {
+                return new MechanicResult.Rejected("require_sneak enabled and actor is not sneaking");
+            }
+        }
+
         WorldPosition origin = Objects.requireNonNull(executionOrigin.origin(), "origin");
         Optional<Short> originBlockId = blockQuery.findCustomBlockNumericId(origin);
 
@@ -108,12 +125,12 @@ public final class VeinMinerMechanic implements Mechanic {
             return new MechanicResult.Rejected("Origin block is not a custom block");
         }
 
-        int maxBlocks = resolveMaxBlocks(arguments);
-        int maxDepth = resolveMaxDepth(arguments);
-        boolean respectFortune = resolveBoolean(arguments, "respect_fortune", defaultRespectFortune);
-        boolean respectSilkTouch = resolveBoolean(arguments, "respect_silk_touch", defaultRespectSilkTouch);
         boolean allAdjacent = resolveBoolean(arguments, "shape", false,
                 value -> "ALL_ADJACENT".equalsIgnoreCase(String.valueOf(value)));
+        int maxBlocks = resolveMaxBlocks(arguments, allAdjacent);
+        int maxDepth = resolveMaxDepth(arguments, allAdjacent);
+        boolean respectFortune = resolveBoolean(arguments, "respect_fortune", defaultRespectFortune);
+        boolean respectSilkTouch = resolveBoolean(arguments, "respect_silk_touch", defaultRespectSilkTouch);
 
         short veinBlockType = originBlockId.get();
         Set<WorldPosition> visited = new HashSet<>();
@@ -169,12 +186,14 @@ public final class VeinMinerMechanic implements Mechanic {
         return new MechanicResult.Done(affectedBlocks);
     }
 
-    private int resolveMaxBlocks(Optional<MechanicArguments> arguments) {
-        return resolveInt(arguments, "max_blocks", defaultMaxBlocks, 1, ABSOLUTE_MAX_BLOCKS);
+    private int resolveMaxBlocks(Optional<MechanicArguments> arguments, boolean allAdjacent) {
+        int resolved = resolveInt(arguments, "max_blocks", defaultMaxBlocks, 1, ABSOLUTE_MAX_BLOCKS);
+        return allAdjacent ? Math.min(resolved, ALL_ADJACENT_MAX_BLOCKS) : resolved;
     }
 
-    private int resolveMaxDepth(Optional<MechanicArguments> arguments) {
-        return resolveInt(arguments, "max_depth", defaultMaxDepth, 1, HARD_MAX_DEPTH);
+    private int resolveMaxDepth(Optional<MechanicArguments> arguments, boolean allAdjacent) {
+        int resolved = resolveInt(arguments, "max_depth", defaultMaxDepth, 1, HARD_MAX_DEPTH);
+        return allAdjacent ? Math.min(resolved, ALL_ADJACENT_MAX_DEPTH) : resolved;
     }
 
     private int resolveInt(

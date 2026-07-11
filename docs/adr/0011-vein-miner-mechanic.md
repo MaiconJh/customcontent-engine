@@ -225,13 +225,17 @@ items:
 ✅ **YAML arguments plumbed into execution context:** new module capability `MechanicArguments` (`internalapi/mechanic/capability/MechanicArguments.java`); `VeinMinerRuntimeService` wraps `binding.arguments()` and injects it; `VeinMinerMechanic` reads `max_blocks`, `max_depth`, `shape` (FACE_ADJACENT/ALL_ADJACENT), `respect_fortune`, `respect_silk_touch` from the context (clamped to safe absolute limits: `max_blocks` ∈ [1,512], `max_depth` ∈ [1,64]).  
 ✅ Unit test: `VeinMinerMechanicTest.appliesMaxBlocksFromMechanicArguments`.  
 
-**Not Implemented Yet (scope/guardrail limits):**
-- `require_sneak` requires player sneak state, which is not yet available in the mechanic context (no `ExecutionOrigin`/actor sneak capability). It is parsed but not enforced.
-- `durability_per_block` requires per-block `ToolWearPort` application; pending (see medium-priority plan).
-- Player toggle command and `ProtectionPort` integration remain pending.
-- **Spike 5** is not yet wired: there is no `veinMinerSpike` Gradle task in the project. A benchmark/benchmark task must be created (or run ad hoc) to validate BFS performance per ADR-0011 acceptance criteria.
+**Implementation Status (2026-07-11):**
+
+✅ **Spike 5 concluded**: JMH benchmarks (`build/reports/jmh/results.json`) confirm face-adjacent BFS with `HashSet` is viable (≈140–160 ops/s for veins of 10–200 blocks; overhead < 1 ms at `max_blocks=64`). All-adjacent (26 directions) is ~30–40× slower and remains guarded by conservative limits.
+✅ **`require_sneak`** supported via the new modular `ActorState` capability (`internalapi/mechanic/capability/ActorState.java`, `ACTOR_STATE` in `Capability`), implemented by `BukkitActorStateAdapter` (adapter/platform) and enforced in `VeinMinerMechanic` (rejects when sneaking is required but the actor is not sneaking; if `ActorState` is unavailable the execution is also rejected).
+✅ **`durability_per_block`** supported: `ToolWearPort` gained an `applyWearIfNeeded(actorKey, toolId, count)` default; `VeinMinerRuntimeService` applies per-block wear (count = affected blocks) or a single wear when `durability_per_block` is `false` (default `true`).
+✅ **Player toggle command** (`/veinminertoggle`, `plugin.yml`) backed by `PlayerPreferenceService` (application) and `VeinMinerToggleCommandAdapter` (adapter/bukkit); `VeinMinerEventTriggerService` skips execution when the player disabled the mechanic.
+✅ **`ProtectionPort` integration**: `VeinMinerRuntimeService` hides protected positions from the `BlockQuery` capability so protected blocks are skipped without being counted, mutated, or consuming budget. The port is optional (`null` when no protection adapter is wired).
+✅ **All-adjacent limits**: `VeinMinerMechanic` clamps `max_blocks` to ≤ 32 and `max_depth` to ≤ 10 when `shape == ALL_ADJACENT`, protecting TPS for the slower 26-direction expansion.
+
+**Remaining (out of this change):** Paper integration tests for the toggle/durability/protection paths, and a concrete `ProtectionPort` adapter (currently the runtime accepts `null`).
 
 **Next Steps:**
-1. Add `require_sneak` (needs sneak state in context) and `durability_per_block` (needs `ToolWearPort`) once the supporting capabilities exist.
-2. Create the `veinMinerSpike` Gradle task / benchmark and execute Spike 5.
-3. Add Paper integration tests and player toggle command.
+1. Add a `ProtectionPort` adapter (e.g. WorldGuard/GriefPrevention bridge) once an ADR approves the integration.
+2. Add Paper integration tests covering sneak, per-block durability, toggle, and protection.

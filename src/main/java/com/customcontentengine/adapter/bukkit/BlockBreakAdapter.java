@@ -3,6 +3,7 @@ package com.customcontentengine.adapter.bukkit;
 import com.customcontentengine.application.block.BlockService;
 import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
 import com.customcontentengine.application.mechanic.VeinMinerEventTriggerService;
+import com.customcontentengine.adapter.platform.BukkitActorStateAdapter;
 import com.customcontentengine.adapter.platform.BukkitEnchantmentViewAdapter;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.port.ItemMetadataPort;
@@ -75,7 +76,8 @@ public final class BlockBreakAdapter implements Listener {
                         itemId,
                         origin,
                         event.getPlayer().getUniqueId().toString(),
-                        new BukkitEnchantmentViewAdapter(item)));
+                        new BukkitEnchantmentViewAdapter(item),
+                        new BukkitActorStateAdapter(event.getPlayer())));
     }
 
     private WorldPosition toWorldPosition(Location location) {
