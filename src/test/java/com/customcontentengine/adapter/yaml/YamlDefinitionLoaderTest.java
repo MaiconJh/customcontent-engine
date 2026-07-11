@@ -280,13 +280,46 @@ class YamlDefinitionLoaderTest {
     }
 
     @Test
-    void loadsItemDurabilityDefinition() throws IOException {
-        DefinitionRegistry registry = loader().load(writeYaml(validYamlWithDurability()).toFile());
+    void loadsMechanicArguments() throws IOException {
+        DefinitionRegistry registry = loader().load(writeYaml(validYamlWithMechanicArguments()).toFile());
 
-        var item = registry.findItem(new CustomItemId("ruby_pickaxe")).orElseThrow();
-        assertTrue(item.durability().isPresent());
-        assertEquals(500, item.durability().get().max());
-        assertEquals(1, item.durability().get().damageOnCustomBlockBreak());
+        var binding = registry.mechanicBindings().bindingsFor(
+                new CustomItemId("ruby_pickaxe"),
+                MechanicTrigger.ON_BLOCK_BREAK).get(0);
+        assertEquals(new MechanicId("vein_miner"), binding.mechanicId());
+        assertEquals(64, binding.arguments().get("max_blocks"));
+        assertEquals(20, binding.arguments().get("max_depth"));
+        assertEquals(true, binding.arguments().get("require_sneak"));
+    }
+
+    private String validYamlWithMechanicArguments() {
+        return """
+                schema: 1
+                blocks:
+                  ruby_ore:
+                    numeric_id: 1
+                    material_base: NOTE_BLOCK
+                    custom_model_data: 1001
+                    required_tool: ruby_pickaxe
+                    drops:
+                      - item: ruby
+                        amount: 1
+                items:
+                  ruby_pickaxe:
+                    material_base: DIAMOND_PICKAXE
+                    custom_model_data: 2001
+                    attributes:
+                      damage: 5.0
+                      speed: 1.2
+                      durability: 500
+                    mechanics:
+                      on_block_break:
+                        - id: vein_miner
+                          arguments:
+                            max_blocks: 64
+                            max_depth: 20
+                            require_sneak: true
+                """;
     }
 
     @Test

@@ -19,6 +19,7 @@ import com.customcontentengine.internalapi.identity.CustomItemId;
 import com.customcontentengine.internalapi.mechanic.MechanicId;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -168,14 +169,46 @@ private List<ItemDef> loadItems(ConfigurationSection itemsSection) {
                 MechanicTrigger trigger = mechanicTrigger(id, triggerKey);
                 List<?> mechanicIds = mechanics.getList(triggerKey);
                 for (int index = 0; index < mechanicIds.size(); index++) {
-                    bindings.add(new MechanicBinding(
-                            itemId,
-                            trigger,
-                            mechanicId(id, triggerKey, index, (String) mechanicIds.get(index))));
+                    Object raw = mechanicIds.get(index);
+                    if (raw instanceof String idValue) {
+                        bindings.add(new MechanicBinding(
+                                itemId,
+                                trigger,
+                                mechanicId(id, triggerKey, index, idValue)));
+                    } else if (raw instanceof Map<?, ?> entry) {
+                        Object rawId = entry.get("id");
+                        if (!(rawId instanceof String idValue)) {
+                            throw new YamlDefinitionException("Invalid definitions.yml: items." + id
+                                    + ".mechanics." + triggerKey + "[" + index + "] requires an 'id' string");
+                        }
+                        Map<String, Object> arguments = loadArguments(entry.get("arguments"));
+                        bindings.add(new MechanicBinding(
+                                itemId,
+                                trigger,
+                                mechanicId(id, triggerKey, index, idValue),
+                                arguments));
+                    } else {
+                        throw new YamlDefinitionException("Invalid definitions.yml: items." + id
+                                + ".mechanics." + triggerKey + "[" + index + "] must be a string or a map");
+                    }
                 }
             }
         }
         return new MechanicBindingRegistry(bindings);
+    }
+
+    private Map<String, Object> loadArguments(Object raw) {
+        if (raw == null) {
+            return Map.of();
+        }
+        if (!(raw instanceof Map<?, ?> map)) {
+            throw new YamlDefinitionException("Invalid definitions.yml: mechanic 'arguments' must be a map");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            result.put(String.valueOf(entry.getKey()), entry.getValue());
+        }
+        return result;
     }
 
     private CustomBlockId blockId(String id) {

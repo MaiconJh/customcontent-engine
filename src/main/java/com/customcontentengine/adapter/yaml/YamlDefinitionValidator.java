@@ -109,8 +109,21 @@ public final class YamlDefinitionValidator {
                 }
                 for (int index = 0; index < mechanicIds.size(); index++) {
                     Object mechanicId = mechanicIds.get(index);
-                    if (!(mechanicId instanceof String mechanicIdText) || mechanicIdText.isBlank()) {
-                        throw error("items." + id + ".mechanics." + trigger + "[" + index + "] must be a non-empty string");
+                    if (mechanicId instanceof String mechanicIdText) {
+                        if (mechanicIdText.isBlank()) {
+                            throw error("items." + id + ".mechanics." + trigger + "[" + index + "] must be a non-empty string");
+                        }
+                    } else if (mechanicId instanceof java.util.Map<?, ?> mechanicEntry) {
+                        Object rawId = mechanicEntry.get("id");
+                        if (!(rawId instanceof String mechanicIdText) || mechanicIdText.isBlank()) {
+                            throw error("items." + id + ".mechanics." + trigger + "[" + index + "].id must be a non-empty string");
+                        }
+                        Object rawArguments = mechanicEntry.get("arguments");
+                        if (rawArguments != null && !(rawArguments instanceof java.util.Map<?, ?>)) {
+                            throw error("items." + id + ".mechanics." + trigger + "[" + index + "].arguments must be a map");
+                        }
+                    } else {
+                        throw error("items." + id + ".mechanics." + trigger + "[" + index + "] must be a non-empty string or a map with 'id'");
                     }
                 }
             }

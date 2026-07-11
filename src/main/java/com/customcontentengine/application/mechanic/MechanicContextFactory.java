@@ -8,7 +8,9 @@ import com.customcontentengine.internalapi.mechanic.capability.BlockQuery;
 import com.customcontentengine.internalapi.mechanic.capability.BudgetView;
 import com.customcontentengine.internalapi.mechanic.capability.CooldownView;
 import com.customcontentengine.internalapi.mechanic.capability.DropSink;
+import com.customcontentengine.internalapi.mechanic.capability.EnchantmentView;
 import com.customcontentengine.internalapi.mechanic.capability.ExecutionOrigin;
+import com.customcontentengine.internalapi.mechanic.capability.MechanicArguments;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,17 +43,36 @@ public final class MechanicContextFactory {
         Objects.requireNonNull(descriptor, "descriptor");
         Map<Class<?>, Object> contextCapabilities = new LinkedHashMap<>();
         for (Capability capability : descriptor.requiredCapabilities()) {
+            contextCapabilities.put(capabilityTypeFor(capability), capabilityInstance(capability));
+        }
+        for (Capability capability : descriptor.optionalCapabilities()) {
             Class<?> capabilityType = CAPABILITY_TYPES.get(capability);
             if (capabilityType == null) {
                 throw new IllegalArgumentException("Unknown capability: " + capability);
             }
             Object capabilityInstance = availableCapabilities.get(capabilityType);
-            if (capabilityInstance == null) {
-                throw new IllegalArgumentException("Capability is not available: " + capability);
+            if (capabilityInstance != null) {
+                contextCapabilities.put(capabilityType, capabilityInstance);
             }
-            contextCapabilities.put(capabilityType, capabilityInstance);
         }
         return new MapBackedMechanicContext(contextCapabilities);
+    }
+
+    private Class<?> capabilityTypeFor(Capability capability) {
+        Class<?> capabilityType = CAPABILITY_TYPES.get(capability);
+        if (capabilityType == null) {
+            throw new IllegalArgumentException("Unknown capability: " + capability);
+        }
+        return capabilityType;
+    }
+
+    private Object capabilityInstance(Capability capability) {
+        Class<?> capabilityType = capabilityTypeFor(capability);
+        Object capabilityInstance = availableCapabilities.get(capabilityType);
+        if (capabilityInstance == null) {
+            throw new IllegalArgumentException("Capability is not available: " + capability);
+        }
+        return capabilityInstance;
     }
 
     public MechanicContext createEmptyContext() {
@@ -66,6 +87,8 @@ public final class MechanicContextFactory {
         types.put(Capability.COOLDOWN_VIEW, CooldownView.class);
         types.put(Capability.DROP_SINK, DropSink.class);
         types.put(Capability.EXECUTION_ORIGIN, ExecutionOrigin.class);
+        types.put(Capability.ENCHANTMENT_VIEW, EnchantmentView.class);
+        types.put(Capability.MECHANIC_ARGUMENTS, MechanicArguments.class);
         return Map.copyOf(types);
     }
 

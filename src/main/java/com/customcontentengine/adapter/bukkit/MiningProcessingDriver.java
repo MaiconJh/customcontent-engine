@@ -1,34 +1,38 @@
 package com.customcontentengine.adapter.bukkit;
 
 import com.customcontentengine.application.mining.MiningRuntimeProcessor;
+import com.customcontentengine.port.PeriodicSchedulerPort;
 import java.util.Objects;
 import java.util.function.LongSupplier;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitTask;
 
+/**
+ * Infrastructure orchestrator that periodically drives active mining session
+ * processing. Scheduling is delegated to {@link PeriodicSchedulerPort} so the
+ * driver stays free of direct Bukkit dependencies.
+ */
 public final class MiningProcessingDriver {
-    private final Plugin plugin;
+    private final PeriodicSchedulerPort scheduler;
     private final MiningRuntimeProcessor processor;
     private final LongSupplier clockMillis;
     private final int maxSessionsPerRun;
     private final long periodTicks;
-    private BukkitTask task;
+    private PeriodicSchedulerPort.ScheduledTask task;
 
     public MiningProcessingDriver(
-            Plugin plugin,
+            PeriodicSchedulerPort scheduler,
             MiningRuntimeProcessor processor,
             int maxSessionsPerRun,
             long periodTicks) {
-        this(plugin, processor, System::currentTimeMillis, maxSessionsPerRun, periodTicks);
+        this(scheduler, processor, System::currentTimeMillis, maxSessionsPerRun, periodTicks);
     }
 
     MiningProcessingDriver(
-            Plugin plugin,
+            PeriodicSchedulerPort scheduler,
             MiningRuntimeProcessor processor,
             LongSupplier clockMillis,
             int maxSessionsPerRun,
             long periodTicks) {
-        this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.processor = Objects.requireNonNull(processor, "processor");
         this.clockMillis = Objects.requireNonNull(clockMillis, "clockMillis");
         if (maxSessionsPerRun <= 0) {
@@ -45,8 +49,7 @@ public final class MiningProcessingDriver {
         if (task != null) {
             return;
         }
-        task = plugin.getServer().getScheduler().runTaskTimer(
-                plugin,
+        task = scheduler.scheduleAtFixedRate(
                 () -> processor.processActiveSessions(clockMillis.getAsLong(), maxSessionsPerRun),
                 periodTicks,
                 periodTicks);

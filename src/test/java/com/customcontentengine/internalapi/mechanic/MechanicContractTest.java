@@ -72,8 +72,10 @@ class MechanicContractTest {
                 Capability.BUDGET_VIEW,
                 Capability.COOLDOWN_VIEW,
                 Capability.DROP_SINK,
-                Capability.EXECUTION_ORIGIN
+                Capability.EXECUTION_ORIGIN,
+                Capability.ENCHANTMENT_VIEW,
+                Capability.MECHANIC_ARGUMENTS
         )));
-        assertEquals(6, Capability.values().length);
+        assertEquals(8, Capability.values().length);
     }
 }

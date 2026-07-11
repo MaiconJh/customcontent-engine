@@ -95,13 +95,13 @@ Allowed MVP-1 work only after MVP-0 is stable:
 
 Do not implement in the MVP unless an ADR explicitly changes the milestone:
 
-- `vein_miner`;
+- `vein_miner` (authorized as an official module by ADR-0011; see note below);
 - `block_transform`;
 - `auto_smelt`;
 - second or third gameplay mechanic beyond the approved MVP-1 mechanic;
-- Fortune;
-- Silk Touch;
-- vanilla enchantment logic;
+- Fortune (authorized for `vein_miner` only via the `ENCHANTMENT_VIEW` module capability, ADR-0011);
+- Silk Touch (authorized for `vein_miner` only via the `ENCHANTMENT_VIEW` module capability, ADR-0011);
+- vanilla enchantment logic (only the pure query surface in `EnchantmentView` is allowed);
 - anvil handling;
 - smithing handling;
 - grindstone handling;
@@ -121,6 +121,8 @@ Do not implement in the MVP unless an ADR explicitly changes the milestone:
 - GUI/menu systems;
 - resource pack generation or hosting;
 - generic scripting systems.
+
+> **Scope note (ADR-0011):** `vein_miner` is accepted as an official module and may use the `ENCHANTMENT_VIEW` *module* capability (not a stable core capability) to read Fortune/Silk Touch levels purely. This is an explicit, bounded exception to the MVP boundary; it does not promote `vein_miner`, Fortune, or Silk Touch into the stable core. The capability must remain optional (declared via `MechanicDescriptor.optionalCapabilities`) and platform access confined to a `BukkitEnchantmentViewAdapter`.
 
 ---
 
@@ -492,13 +494,14 @@ Examples:
 Specialized capabilities must start outside the stable core.
 
 Examples:
-
 - particle emitter;
 - sound emitter;
 - transform rule;
 - vein graph query;
 - resource export;
-- advanced visual effect capability.
+- advanced visual effect capability;
+- `EnchantmentView` (module capability, ADR-0011);
+- `MechanicArguments` (module capability, ADR-0011).
 
 Rules:
 
@@ -562,6 +565,9 @@ Current MVP:
 ```text
 SchedulerPort:
   runOnRegion(WorldPosition, Runnable)
+
+PeriodicSchedulerPort (ADR-0012):
+  scheduleAtFixedRate(Runnable, long initialDelay, long period) -> ScheduledTask
 ```
 
 Out of MVP:
@@ -575,6 +581,9 @@ SchedulerAccess inside MechanicContext
 Rules:
 
 - Every world modification must go through `SchedulerPort` or `WorldMutationPort`.
+- Periodic, repetitive work (e.g. mining session processing) must go through `PeriodicSchedulerPort`, not through direct Bukkit `runTaskTimer` calls in adapters.
+- `PeriodicSchedulerPort` must not expose `runAsync` or `runOnEntity`; scheduling stays synchronous with the server tick.
+- The Paper adapter for `PeriodicSchedulerPort` must use `runTaskTimer` (synchronous), not `runTaskTimerAsynchronously`.
 - Never call `Bukkit.getScheduler()` from mechanics.
 - Folia ownership validation belongs in the Folia adapter.
 - Do not use `ThreadLocal` as the architectural model for regional budgeting.

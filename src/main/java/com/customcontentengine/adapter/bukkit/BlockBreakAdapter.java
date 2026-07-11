@@ -2,6 +2,8 @@ package com.customcontentengine.adapter.bukkit;
 
 import com.customcontentengine.application.block.BlockService;
 import com.customcontentengine.application.mechanic.AreaBreakEventTriggerService;
+import com.customcontentengine.application.mechanic.VeinMinerEventTriggerService;
+import com.customcontentengine.adapter.platform.BukkitEnchantmentViewAdapter;
 import com.customcontentengine.internalapi.identity.WorldPosition;
 import com.customcontentengine.port.ItemMetadataPort;
 import java.util.Objects;
@@ -16,20 +18,28 @@ public final class BlockBreakAdapter implements Listener {
     private final BlockService blockService;
     private final ItemMetadataPort<ItemStack> itemMetadata;
     private final AreaBreakEventTriggerService areaBreakTriggerService;
+    private final VeinMinerEventTriggerService veinMinerTriggerService;
 
     public BlockBreakAdapter(BlockService blockService) {
-        this.blockService = Objects.requireNonNull(blockService, "blockService");
-        this.itemMetadata = null;
-        this.areaBreakTriggerService = null;
+        this(blockService, null, null, null);
     }
 
     public BlockBreakAdapter(
             BlockService blockService,
             ItemMetadataPort<ItemStack> itemMetadata,
             AreaBreakEventTriggerService areaBreakTriggerService) {
+        this(blockService, itemMetadata, areaBreakTriggerService, null);
+    }
+
+    public BlockBreakAdapter(
+            BlockService blockService,
+            ItemMetadataPort<ItemStack> itemMetadata,
+            AreaBreakEventTriggerService areaBreakTriggerService,
+            VeinMinerEventTriggerService veinMinerTriggerService) {
         this.blockService = Objects.requireNonNull(blockService, "blockService");
-        this.itemMetadata = Objects.requireNonNull(itemMetadata, "itemMetadata");
-        this.areaBreakTriggerService = Objects.requireNonNull(areaBreakTriggerService, "areaBreakTriggerService");
+        this.itemMetadata = itemMetadata;
+        this.areaBreakTriggerService = areaBreakTriggerService;
+        this.veinMinerTriggerService = veinMinerTriggerService;
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -40,6 +50,7 @@ public final class BlockBreakAdapter implements Listener {
             event.setDropItems(false);
         }
         triggerAreaBreakIfConfigured(event, origin);
+        triggerVeinMinerIfConfigured(event, origin);
     }
 
     private void triggerAreaBreakIfConfigured(BlockBreakEvent event, WorldPosition origin) {
@@ -52,6 +63,19 @@ public final class BlockBreakAdapter implements Listener {
                         itemId,
                         origin,
                         event.getPlayer().getUniqueId().toString()));
+    }
+
+    private void triggerVeinMinerIfConfigured(BlockBreakEvent event, WorldPosition origin) {
+        if (itemMetadata == null || veinMinerTriggerService == null) {
+            return;
+        }
+        ItemStack item = event.getPlayer().getInventory().getItemInMainHand();
+        itemMetadata.readCustomItemIdentity(item)
+                .ifPresent(itemId -> veinMinerTriggerService.trigger(
+                        itemId,
+                        origin,
+                        event.getPlayer().getUniqueId().toString(),
+                        new BukkitEnchantmentViewAdapter(item)));
     }
 
     private WorldPosition toWorldPosition(Location location) {

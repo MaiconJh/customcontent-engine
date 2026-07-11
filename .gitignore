@@ -8,6 +8,8 @@ build/
 .vscode/
 .wrangler/
 .kilo/
+.tessera/
+
 
 node_modules/
 cloudflare/ci-ai-worker/node_modules/

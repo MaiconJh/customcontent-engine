@@ -101,6 +101,15 @@ tasks.register<JavaExec>("binaryPdcSpike") {
     args(layout.buildDirectory.file("reports/spikes/001-binary-pdc-performance-results.md").get().asFile.absolutePath)
 }
 
+tasks.register<JavaExec>("veinMinerSpike") {
+    description = "Runs Spike 5 vein miner BFS feasibility measurements."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    classpath = spike.runtimeClasspath
+    mainClass.set("com.customcontentengine.spike.VeinMinerFeasibilitySpike")
+    dependsOn(tasks.named(spike.classesTaskName))
+    args(layout.buildDirectory.file("reports/spikes/005-vein-miner-feasibility-results.md").get().asFile.absolutePath)
+}
+
 fun File.sha256(): String {
     val digest = MessageDigest.getInstance("SHA-256")
     inputStream().use { input ->

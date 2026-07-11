@@ -154,13 +154,14 @@ customcontent/
 │   └── budget/                  (WorkBudget, WorkBudgetManager, RegionBudgetKey)
 ├── port/                        (Dependency inversion interfaces)
 │   ├── SchedulerPort
+│   ├── PeriodicSchedulerPort
 │   ├── BlockStorePort
 │   ├── WorldMutationPort
 │   ├── ItemMetadataPort
 │   ├── DropPort
 │   └── ProtectionPort
 ├── adapter/                     (Infrastructure implementations)
-│   ├── platform/                (PaperSchedulerAdapter, future FoliaSchedulerAdapter)
+│   ├── platform/                (PaperSchedulerAdapter, PaperPeriodicSchedulerAdapter, future FoliaSchedulerAdapter)
 │   ├── persistence/             (PdcBlockStore, PdcBlockCodec)
 │   ├── yaml/                    (YamlDefinitionLoader, YamlDefinitionValidator)
 │   └── bukkit/                  (Segmented listeners and commands)
@@ -216,6 +217,7 @@ customcontent/
 ### 9.5 Scheduler and Threading
 
 - `SchedulerPort` exposes only `runOnRegion(WorldPosition, Runnable)` in the MVP.
+- `PeriodicSchedulerPort` exposes only `scheduleAtFixedRate(Runnable, long, long)` returning a cancellable `ScheduledTask`. It is a separate port (ADR-0012) used by infrastructure orchestrators (e.g. `MiningProcessingDriver`) for repetitive, tick-aligned work, keeping them free of direct Bukkit dependencies.
 - `runOnEntity` and `runAsync` are outside the MVP and may be introduced only when real use cases exist, using custom abstractions to avoid leaking Bukkit types into the interface.
 - In Folia, the adapter validates region ownership before accessing the world.
 - `WorkBudget` uses explicit `RegionBudgetKey`, not `ThreadLocal`, as an architectural contract.
