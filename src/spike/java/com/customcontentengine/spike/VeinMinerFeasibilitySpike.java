@@ -3,8 +3,11 @@ package com.customcontentengine.spike;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -16,7 +19,6 @@ import java.util.Set;
 public final class VeinMinerFeasibilitySpike {
 
     // ========== CONFIGURAÇÃO ==========
-    // MODE: "fast" | "medium" (padrão) | "complete"
     private static final String MODE = System.getenv().getOrDefault("MODE", "medium");
 
     private static final boolean FAST_MODE = "fast".equalsIgnoreCase(MODE);
@@ -28,11 +30,15 @@ public final class VeinMinerFeasibilitySpike {
 
     private static final int WARMUP_ITERATIONS = FAST_MODE ? 10
             : COMPLETE_MODE ? 2_000
-            : 200;  // medium
+            : 200;
 
     private static final int MEASUREMENT_ITERATIONS = FAST_MODE ? 20
             : COMPLETE_MODE ? 8_000
-            : 500;  // medium
+            : 500;
+
+    // ========== LOGGING ==========
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+    private static final int LOG_INTERVAL_PERCENT = 10; // Log a cada 10%
 
     // ========== CACHE DE OFFSETS PARA ALL_ADJACENT ==========
     private static final int[][] ALL_OFFSETS = new int[26][3];
@@ -54,11 +60,17 @@ public final class VeinMinerFeasibilitySpike {
     }
 
     public static void main(String[] args) throws Exception {
-        System.out.println("Spike started at " + LocalDateTime.now());
-        System.out.println("MODE = " + MODE);
-        System.out.println("VEIN_SIZES = " + java.util.Arrays.toString(VEIN_SIZES));
-        System.out.println("WARMUP_ITERATIONS = " + WARMUP_ITERATIONS);
-        System.out.println("MEASUREMENT_ITERATIONS = " + MEASUREMENT_ITERATIONS);
+        Instant overallStart = Instant.now();
+        logInfo("========================================");
+        logInfo("Spike started at " + LocalDateTime.now());
+        logInfo("========================================");
+        logInfo("MODE = " + MODE);
+        logInfo("VEIN_SIZES = " + java.util.Arrays.toString(VEIN_SIZES));
+        logInfo("WARMUP_ITERATIONS = " + WARMUP_ITERATIONS);
+        logInfo("MEASUREMENT_ITERATIONS = " + MEASUREMENT_ITERATIONS);
+        logInfo("LOG_INTERVAL = " + LOG_INTERVAL_PERCENT + "%");
+        logInfo("========================================");
+        logInfo("");
 
         Path reportPath = args.length == 0
                 ? Path.of("build/reports/spikes/005-vein-miner-feasibility-results.md")
@@ -69,34 +81,129 @@ public final class VeinMinerFeasibilitySpike {
         int current = 0;
 
         for (int veinSize : VEIN_SIZES) {
-            System.out.println("--- Creating scenario for vein size " + veinSize + " ---");
+            logInfo("--- Creating scenario for vein size " + veinSize + " ---");
             VeinScenario scenario = createVeinScenario(veinSize);
-            System.out.println("Scenario created with " + scenario.positions().size() + " positions.");
+            logInfo("Scenario created with " + scenario.positions().size() + " positions.");
 
             current++;
-            System.out.println("[" + current + "/" + totalOperations + "] Measuring bfs-hashset...");
-            results.add(measure("bfs-hashset", veinSize, () -> runVeinMinerBfs(
+            logInfo("[" + current + "/" + totalOperations + "] Measuring bfs-hashset (veinSize=" + veinSize + ")...");
+            results.add(measureWithProgress("bfs-hashset", veinSize, () -> runVeinMinerBfs(
                     scenario.customBlockSet(), scenario.origin, 64, 20)));
 
             current++;
-            System.out.println("[" + current + "/" + totalOperations + "] Measuring bfs-arraylist...");
-            results.add(measure("bfs-arraylist", veinSize, () -> runVeinMinerBfsArrayList(
+            logInfo("[" + current + "/" + totalOperations + "] Measuring bfs-arraylist (veinSize=" + veinSize + ")...");
+            results.add(measureWithProgress("bfs-arraylist", veinSize, () -> runVeinMinerBfsArrayList(
                     scenario.customBlockSet(), scenario.origin, 64, 20)));
 
             current++;
-            System.out.println("[" + current + "/" + totalOperations + "] Measuring bfs-hashset-alladjacent...");
-            results.add(measure("bfs-hashset-alladjacent", veinSize, () -> runVeinMinerBfsAllAdjacent(
+            logInfo("[" + current + "/" + totalOperations + "] Measuring bfs-hashset-alladjacent (veinSize=" + veinSize + ")...");
+            results.add(measureWithProgress("bfs-hashset-alladjacent", veinSize, () -> runVeinMinerBfsAllAdjacent(
                     scenario.customBlockSet(), scenario.origin, 64, 20)));
         }
 
-        System.out.println("All measurements done. Generating report...");
+        logInfo("");
+        logInfo("========================================");
+        logInfo("All measurements done. Generating report...");
         String report = report(results);
         Files.createDirectories(reportPath.getParent());
         Files.writeString(reportPath, report);
-        System.out.println("Report written to " + reportPath.toAbsolutePath());
-        System.out.println(report);
-        System.out.println("Spike finished at " + LocalDateTime.now());
+        logInfo("Report written to " + reportPath.toAbsolutePath());
+        logInfo("");
+        logInfo(report);
+        logInfo("");
+        logInfo("========================================");
+        logInfo("Spike finished at " + LocalDateTime.now());
+        logInfo("Total elapsed time: " + formatDuration(Duration.between(overallStart, Instant.now())));
+        logInfo("========================================");
     }
+
+    // ==================== LOGGING UTILITIES ====================
+
+    private static void logInfo(String message) {
+        System.out.printf("[%s] [INFO] %s%n",
+                LocalDateTime.now().format(TIME_FORMATTER), message);
+    }
+
+    private static void logDebug(String message) {
+        System.out.printf("[%s] [DEBUG] %s%n",
+                LocalDateTime.now().format(TIME_FORMATTER), message);
+    }
+
+    private static String formatDuration(Duration duration) {
+        long seconds = duration.getSeconds();
+        long millis = duration.toMillisPart();
+        if (seconds < 60) {
+            return seconds + "s " + millis + "ms";
+        }
+        long minutes = seconds / 60;
+        seconds = seconds % 60;
+        if (minutes < 60) {
+            return minutes + "m " + seconds + "s";
+        }
+        long hours = minutes / 60;
+        minutes = minutes % 60;
+        return hours + "h " + minutes + "m " + seconds + "s";
+    }
+
+    private static String estimateETA(Duration elapsed, int done, int total) {
+        if (done == 0) return "calculating...";
+        long avgNanos = elapsed.toNanos() / done;
+        long remainingNanos = avgNanos * (total - done);
+        return formatDuration(Duration.ofNanos(remainingNanos));
+    }
+
+    // ==================== MEASUREMENT WITH PROGRESS LOGGING ====================
+
+    private static Result measureWithProgress(String operation, int veinSize, Operation measuredOperation) {
+        Instant taskStart = Instant.now();
+
+        logInfo("  Warming up (" + WARMUP_ITERATIONS + " iterations)...");
+        runWithProgress(operation + ":warmup", WARMUP_ITERATIONS, measuredOperation);
+
+        logInfo("  Measuring (" + MEASUREMENT_ITERATIONS + " iterations)...");
+        long allocationBefore = allocatedBytes();
+        long timeBefore = System.nanoTime();
+
+        runWithProgress(operation + ":measure", MEASUREMENT_ITERATIONS, measuredOperation);
+
+        long elapsedNanos = System.nanoTime() - timeBefore;
+        long allocationAfter = allocatedBytes();
+
+        double avgMicros = elapsedNanos / (double) MEASUREMENT_ITERATIONS / 1_000.0;
+        Optional<Double> avgBytes = (allocationAfter >= 0 && allocationBefore >= 0)
+                ? Optional.of((allocationAfter - allocationBefore) / (double) MEASUREMENT_ITERATIONS)
+                : Optional.empty();
+
+        Duration elapsed = Duration.between(taskStart, Instant.now());
+        logInfo("  ✅ Done: " + String.format("%.3f", avgMicros) + " μs/op" +
+                avgBytes.map(b -> ", " + String.format("%.1f", b) + " bytes/op").orElse("") +
+                " (total elapsed: " + formatDuration(elapsed) + ")");
+        logInfo("");
+
+        return new Result(operation, veinSize, avgMicros, avgBytes);
+    }
+
+    private static void runWithProgress(String label, int totalIterations, Operation operation) {
+        if (totalIterations <= 0) return;
+        int logInterval = Math.max(1, totalIterations / (100 / LOG_INTERVAL_PERCENT));
+        Instant start = Instant.now();
+
+        for (int i = 0; i < totalIterations; i++) {
+            operation.run();
+            if ((i + 1) % logInterval == 0 || (i + 1) == totalIterations) {
+                int percent = (int) (((i + 1) * 100.0) / totalIterations);
+                Duration elapsed = Duration.between(start, Instant.now());
+                double avgMsPerOp = elapsed.toNanos() / (double) (i + 1) / 1_000_000.0;
+                String eta = estimateETA(elapsed, i + 1, totalIterations);
+                logDebug("    " + label + " progress: " + percent + "% (" + (i + 1) + "/" + totalIterations +
+                        ") - elapsed: " + formatDuration(elapsed) +
+                        ", avg: " + String.format("%.2f", avgMsPerOp) + " ms/op" +
+                        ", ETA: " + eta);
+            }
+        }
+    }
+
+    // ==================== BFS IMPLEMENTATIONS ====================
 
     private record VeinScenario(
             List<Position> positions,
@@ -267,29 +374,7 @@ public final class VeinMinerFeasibilitySpike {
         }
     }
 
-    private static Result measure(String operation, int veinSize, Operation measuredOperation) {
-        System.out.println("  Warming up...");
-        for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-            measuredOperation.run();
-        }
-        System.out.println("  Measuring...");
-        long allocationBefore = allocatedBytes();
-        long timeBefore = System.nanoTime();
-        for (int i = 0; i < MEASUREMENT_ITERATIONS; i++) {
-            measuredOperation.run();
-        }
-        long elapsedNanos = System.nanoTime() - timeBefore;
-        long allocationAfter = allocatedBytes();
-
-        double avgMicros = elapsedNanos / (double) MEASUREMENT_ITERATIONS / 1_000.0;
-        Optional<Double> avgBytes = (allocationAfter >= 0 && allocationBefore >= 0)
-                ? Optional.of((allocationAfter - allocationBefore) / (double) MEASUREMENT_ITERATIONS)
-                : Optional.empty();
-
-        System.out.println("  Done: " + String.format("%.3f", avgMicros) + " μs/op" +
-                avgBytes.map(b -> ", " + String.format("%.1f", b) + " bytes/op").orElse(""));
-        return new Result(operation, veinSize, avgMicros, avgBytes);
-    }
+    // ==================== UTILITIES ====================
 
     private static long allocatedBytes() {
         var rawBean = ManagementFactory.getThreadMXBean();
