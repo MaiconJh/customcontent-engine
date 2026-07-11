@@ -2,6 +2,17 @@ name: Spike
 
 on:
   workflow_dispatch:
+    inputs:
+      spike-task:
+        description: 'Gradle task name (e.g., veinMinerSpike, binaryPdcSpike)'
+        required: true
+        default: 'veinMinerSpike'
+        type: string
+      fast-mode:
+        description: 'Enable FAST_MODE (reduced iterations, only for veinMinerSpike)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   run:
@@ -14,8 +25,16 @@ jobs:
           distribution: 'temurin'
       - run: chmod +x gradlew
       - run: ./gradlew compileSpikeJava --no-daemon
-      - run: ./gradlew veinMinerSpike --no-daemon
+
+      - name: List available spikes (for reference)
+        run: ./gradlew tasks --all --no-daemon | grep -i spike || true
+
+      - name: Run ${{ github.event.inputs.spike-task }}
+        run: ./gradlew ${{ github.event.inputs.spike-task }} --no-daemon
+        env:
+          FAST_MODE: ${{ github.event.inputs.fast-mode }}
+
       - uses: actions/upload-artifact@v4
         with:
-          name: spike-report
+          name: ${{ github.event.inputs.spike-task }}-report
           path: build/reports/spikes/*.md

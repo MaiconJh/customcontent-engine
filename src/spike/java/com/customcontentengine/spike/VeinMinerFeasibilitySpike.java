@@ -16,7 +16,8 @@ import java.util.Set;
 public final class VeinMinerFeasibilitySpike {
 
     // ========== CONFIGURAÇÃO ==========
-    private static final boolean FAST_MODE = true;  // Altere para false para execução completa
+    // Lê FAST_MODE da variável de ambiente (padrão: false = modo completo)
+    private static final boolean FAST_MODE = Boolean.parseBoolean(System.getenv("FAST_MODE"));
 
     private static final int[] VEIN_SIZES = FAST_MODE
             ? new int[]{64}
