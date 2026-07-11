@@ -1,4 +1,5 @@
 import java.net.URI
+import groovy.json.JsonSlurper
 import org.gradle.jvm.tasks.Jar
 
 plugins {
@@ -41,7 +42,8 @@ configurations[integrationTest.implementationConfigurationName].extendsFrom(conf
 configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
 
 val paperVersion = "1.21.1"
-val paperJarName = "paper-$paperVersion.jar"
+val paperBuild = "133"
+val paperJarName = "paper-$paperVersion-$paperBuild.jar"
 val paperServerJar = layout.buildDirectory.file("paperIntegration/$paperJarName")
 
 val downloadPaperServer by tasks.registering {
@@ -73,10 +75,11 @@ val downloadPaperServer by tasks.registering {
 }
 
 fun extractDownloadUrl(json: String): String {
-    // Busca pela URL dentro de "server:default" no objeto "downloads"
-    val regex = "\"server:default\"\\s*:\\s*\\{[^}]*\"url\"\\s*:\\s*\"([^\"]+)\"".toRegex()
-    return regex.find(json)?.groupValues?.get(1)
-        ?: throw GradleException("Could not find download URL in API response: $json")
+    val slurper = JsonSlurper()
+    val parsed = slurper.parseText(json) as Map<*, *>
+    val downloads = parsed["downloads"] as Map<*, *>
+    val serverDefault = downloads["server:default"] as Map<*, *>
+    return serverDefault["url"] as String
 }
 
 tasks.withType<JavaCompile>().configureEach {
