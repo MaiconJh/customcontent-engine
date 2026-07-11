@@ -8,11 +8,15 @@ on:
         required: true
         default: 'veinMinerSpike'
         type: string
-      fast-mode:
-        description: 'Enable FAST_MODE (reduced iterations, only for veinMinerSpike)'
+      mode:
+        description: 'Execution mode: fast (seconds), medium (minutes), complete (hours)'
         required: false
-        default: false
-        type: boolean
+        default: 'medium'
+        type: choice
+        options:
+          - fast
+          - medium
+          - complete
 
 jobs:
   run:
@@ -32,7 +36,7 @@ jobs:
       - name: Run ${{ github.event.inputs.spike-task }}
         run: ./gradlew ${{ github.event.inputs.spike-task }} --no-daemon
         env:
-          FAST_MODE: ${{ github.event.inputs.fast-mode }}
+          MODE: ${{ github.event.inputs.mode }}
 
       - uses: actions/upload-artifact@v4
         with:

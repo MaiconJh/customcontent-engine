@@ -16,15 +16,23 @@ import java.util.Set;
 public final class VeinMinerFeasibilitySpike {
 
     // ========== CONFIGURAÇÃO ==========
-    // Lê FAST_MODE da variável de ambiente (padrão: false = modo completo)
-    private static final boolean FAST_MODE = Boolean.parseBoolean(System.getenv("FAST_MODE"));
+    // MODE: "fast" | "medium" (padrão) | "complete"
+    private static final String MODE = System.getenv().getOrDefault("MODE", "medium");
+
+    private static final boolean FAST_MODE = "fast".equalsIgnoreCase(MODE);
+    private static final boolean COMPLETE_MODE = "complete".equalsIgnoreCase(MODE);
 
     private static final int[] VEIN_SIZES = FAST_MODE
             ? new int[]{64}
             : new int[]{10, 25, 50, 64, 100, 150, 200};
 
-    private static final int WARMUP_ITERATIONS = FAST_MODE ? 10 : 2_000;
-    private static final int MEASUREMENT_ITERATIONS = FAST_MODE ? 20 : 8_000;
+    private static final int WARMUP_ITERATIONS = FAST_MODE ? 10
+            : COMPLETE_MODE ? 2_000
+            : 200;  // medium
+
+    private static final int MEASUREMENT_ITERATIONS = FAST_MODE ? 20
+            : COMPLETE_MODE ? 8_000
+            : 500;  // medium
 
     // ========== CACHE DE OFFSETS PARA ALL_ADJACENT ==========
     private static final int[][] ALL_OFFSETS = new int[26][3];
@@ -47,7 +55,7 @@ public final class VeinMinerFeasibilitySpike {
 
     public static void main(String[] args) throws Exception {
         System.out.println("Spike started at " + LocalDateTime.now());
-        System.out.println("FAST_MODE = " + FAST_MODE);
+        System.out.println("MODE = " + MODE);
         System.out.println("VEIN_SIZES = " + java.util.Arrays.toString(VEIN_SIZES));
         System.out.println("WARMUP_ITERATIONS = " + WARMUP_ITERATIONS);
         System.out.println("MEASUREMENT_ITERATIONS = " + MEASUREMENT_ITERATIONS);
@@ -309,7 +317,7 @@ public final class VeinMinerFeasibilitySpike {
                 .append(System.getProperty("os.arch")).append(System.lineSeparator());
         builder.append("Warmup iterations per operation: ").append(WARMUP_ITERATIONS).append(System.lineSeparator());
         builder.append("Measured iterations per operation: ").append(MEASUREMENT_ITERATIONS).append(System.lineSeparator());
-        builder.append("FAST_MODE: ").append(FAST_MODE).append(System.lineSeparator());
+        builder.append("MODE: ").append(MODE).append(System.lineSeparator());
         builder.append("Sink: ").append(sink).append(System.lineSeparator()).append(System.lineSeparator());
         builder.append("| Vein Size | Operation | Average microseconds/op | Approx allocated bytes/op |").append(System.lineSeparator());
         builder.append("| ---: | --- | ---: | ---: |").append(System.lineSeparator());
