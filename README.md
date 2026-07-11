@@ -11,6 +11,7 @@ The project follows a conservative-but-evolvable core model: the core stays smal
 - MVP-2: Complete for the custom mining scope.
 - MVP-3: Complete for custom tool durability and wear.
 - Tool Tiers: Official (implemented as official mining feature, not experimental).
+- VeinMiner: Official (ADR-0011), third official builtin mechanic after `area_break` and `block_transform`.
 - Folia: architectural goal; advanced cross-region behavior is not promised as final support yet.
 - Public API: not stable and not available yet.
 
@@ -384,12 +385,49 @@ items:
 
 The mechanic uses the `MECHANIC_CONFIG` capability to read arguments. It is pure, stateless, and independent of Bukkit/Paper.
 
+## VeinMinerMechanic (Official)
+
+`vein_miner` is the third official builtin mechanic (ADR-0011). It mines connected same-type custom blocks in a vein using BFS with `HashSet` visited tracking.
+
+Example YAML:
+
+```yaml
+items:
+  ruby_pickaxe:
+    mechanics:
+      on_block_break:
+        - vein_miner
+          arguments:
+            max_blocks: 64
+            max_depth: 20
+            shape: FACE_ADJACENT        # FACE_ADJACENT (default) | ALL_ADJACENT
+            require_sneak: true
+            respect_fortune: true
+            respect_silk_touch: true
+            durability_per_block: true
+            cooldown_seconds: 5
+            allowed_blocks:
+              - ruby_ore
+              - diamond_ore
+```
+
+Arguments:
+
+- `max_blocks` — maximum blocks per execution (default 64, absolute max 512).
+- `max_depth` — maximum BFS depth (default 20).
+- `shape` — `FACE_ADJACENT` (6 directions, default) or `ALL_ADJACENT` (26 directions). `ALL_ADJACENT` is clamped to `max_blocks<=32` and `max_depth<=10` to protect TPS.
+- `require_sneak` — only executes while the actor is sneaking (via the `ActorState` module capability).
+- `respect_fortune` / `respect_silk_touch` — apply Fortune/Silk Touch drop multipliers via `EnchantmentView`.
+- `durability_per_block` — applies one tool-wear event per block broken (default `true`); otherwise a single wear per execution.
+- `cooldown_seconds` — per-execution cooldown.
+- `allowed_blocks` — optional list restricting which origin blocks trigger the mechanic.
+
+The mechanic is pure, stateless, and Folia-safe: it returns `MechanicResult.Partial` for rescheduling via `SchedulerPort` when the work budget or region safety is exceeded. Protected blocks (via the optional `ProtectionPort`) are skipped without being counted or mutated. Players can disable it per session with `/veinminertoggle`.
+
 ## Current Limitations
 
-- No third mechanic beyond `area_break` and `block_transform`.
-- No `vein_miner`.
-- No `auto_smelt`.
-- No Fortune or Silk Touch.
+- `auto_smelt` not implemented.
+- No generic Fortune/Silk Touch enchantment system; `vein_miner` applies fortune/silk_touch drop multipliers via the `EnchantmentView` module capability.
 - No Efficiency enchantment support.
 - No multiple-player shared mining of the same block in the current scope.
 - No repair system for custom tool durability (mending, crafting, anvil).
@@ -511,6 +549,7 @@ Important ADRs:
 - ADR 0008 — YAML Mechanic Bindings.
 - ADR 0009 — Custom Mining Model.
 - ADR 0010 — Tool Tiers and Effective Blocks.
+- ADR 0011 — Vein Miner Mechanic.
 
 ## Next Phase
 
@@ -520,7 +559,7 @@ Recommended post-MVP-3 work:
 - Harden MVP-3 durability, mining, and `area_break` integration tests.
 - Refine Folia ownership validation and document advanced cross-region behavior.
 - Define devtools policy, including future treatment of `/debugareabreak`.
-- Evaluate a third mechanic only through the incubation process.
+- `vein_miner` is now the third official mechanic (ADR-0011); any further mechanic must still follow the incubation process.
 
 Any expansion after MVP-3 must follow the project scope, architecture guardrails, accepted ADRs, and the incubation or ADR process required for new contracts, scheduler changes, YAML schema changes, persistence changes, extension points, mining behavior changes, durability behavior changes, or additional mechanics.
 

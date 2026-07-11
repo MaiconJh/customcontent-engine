@@ -241,6 +241,12 @@ Current core capabilities:
 - `EXECUTION_ORIGIN`
 - `MECHANIC_CONFIG`
 
+Module capabilities (specialised for specific mechanics, not stable core):
+
+- `ENCHANTMENT_VIEW` — queries enchantment levels (fortune, silk_touch) without Bukkit/Paper.
+- `MECHANIC_ARGUMENTS` — exposes per-binding YAML `arguments` to the executing mechanic.
+- `ACTOR_STATE` — exposes actor state (e.g. `isSneaking()`) to the executing mechanic.
+
 Mechanic result:
 
 - `Done(int affectedBlocks)`
@@ -260,6 +266,7 @@ Current official builtin mechanics:
 
 - `area_break`
 - `block_transform`
+- `vein_miner`
 
 `area_break` rules:
 
@@ -269,6 +276,17 @@ Current official builtin mechanics:
 - Does not own scheduler logic.
 - Does not know mining exists.
 - Continues to run through `mechanics.on_block_break` after custom mining completion when configured.
+
+`vein_miner` rules (ADR-0011, official):
+
+- BFS in 6 face-adjacent directions (default) or 26 directions (`ALL_ADJACENT`) using `HashSet` for O(1) visited lookup.
+- Folia-safe: returns `MechanicResult.Partial` for rescheduling via `SchedulerPort` when the work budget or region safety is exceeded.
+- Optional arguments: `max_blocks` (default 64, abs max 512), `max_depth` (default 20), `shape` (`FACE_ADJACENT`|`ALL_ADJACENT`), `require_sneak`, `respect_fortune`, `respect_silk_touch`, `durability_per_block` (default true), `cooldown_seconds`, `allowed_blocks`.
+- `ALL_ADJACENT` is clamped to `max_blocks<=32` and `max_depth<=10` to protect TPS.
+- `require_sneak` rejects execution when `ActorState` is missing or the actor is not sneaking.
+- `durability_per_block` applies per-block tool wear via `ToolWearPort`; otherwise a single wear.
+- Honors `ProtectionPort` (optional): protected positions are hidden from `BlockQuery` and skipped without being counted or mutated.
+- Player toggle (`/veinminertoggle`, in-memory `PlayerPreferenceService`) can disable it per session.
 
 ---
 
@@ -296,8 +314,9 @@ Rules:
 - Only `on_block_break` is currently supported.
 - `on_block_break` is a list of `MechanicId` values or mechanic entries with optional `arguments`.
 - Referenced mechanics must exist in `MechanicRegistry`.
-- Current official/builtin mechanics accepted in this phase: `area_break`, `block_transform`.
+- Current official/builtin mechanics accepted in this phase: `area_break`, `block_transform`, `vein_miner`.
 - `block_transform` accepts arguments via `MECHANIC_CONFIG`: `to_block`, `drop_original`, `consume_budget`.
+- `vein_miner` accepts arguments via `MECHANIC_ARGUMENTS`: `max_blocks`, `max_depth`, `shape`, `require_sneak`, `respect_fortune`, `respect_silk_touch`, `durability_per_block`, `cooldown_seconds`, `allowed_blocks`.
 - No conditions.
 - No expressions.
 - No scripting.
@@ -316,6 +335,27 @@ items:
           arguments:
             to_block: 42
             drop_original: true
+```
+
+Example with `vein_miner` arguments:
+
+```yaml
+items:
+  ruby_pickaxe:
+    mechanics:
+      on_block_break:
+        - vein_miner
+          arguments:
+            max_blocks: 64
+            max_depth: 20
+            shape: FACE_ADJACENT
+            require_sneak: true
+            respect_fortune: true
+            respect_silk_touch: true
+            durability_per_block: true
+            allowed_blocks:
+              - ruby_ore
+              - diamond_ore
 ```
 
 ---
