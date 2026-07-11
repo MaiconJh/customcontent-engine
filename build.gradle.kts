@@ -56,18 +56,17 @@ val downloadPaperServer by tasks.registering {
         val target = paperServerJar.get().asFile
         if (!target.exists()) {
             target.parentFile.mkdirs()
-            
-            // 1. Get latest build info from Fill v3 API
-            val apiUrl = "https://fill.papermc.io/v2/projects/paper/versions/$paperVersion/builds/latest"
+
+            // 1. Consulta a API v3 para obter os dados do build mais recente
+            val apiUrl = "https://fill.papermc.io/v3/projects/paper/versions/$paperVersion/builds/latest"
             val connection = URI(apiUrl).toURL().openConnection()
+            // A nova API exige um User-Agent válido e não genérico
             connection.setRequestProperty("User-Agent", "CustomContentEngine/0.1.0 (https://github.com/MaiconJh/customcontent-engine)")
 
             val jsonResponse = connection.inputStream.bufferedReader().use { it.readText() }
-            
-            // 2. Extract download URL from JSON (simple regex)
-            val downloadUrlRegex = "\"downloadUrl\"\\s*:\\s*\"([^\"]+)\"".toRegex()
-            val downloadUrl = downloadUrlRegex.find(jsonResponse)?.groupValues?.get(1)
-                ?: throw GradleException("Could not extract download URL from Fill API response")
+
+            // 2. Extrai a URL de download do JSON (usando um parser simples)
+            val downloadUrl = extractDownloadUrl(jsonResponse)
 
             println("Downloading Paper from: $downloadUrl")
             URI(downloadUrl).toURL().openStream().use { input ->
@@ -78,6 +77,14 @@ val downloadPaperServer by tasks.registering {
             println("Paper jar already exists: ${target.absolutePath}")
         }
     }
+}
+
+// Função auxiliar para extrair a URL de download do JSON
+fun extractDownloadUrl(json: String): String {
+    // Procura pelo campo "downloadUrl" na resposta JSON
+    val regex = "\"downloadUrl\"\\s*:\\s*\"([^\"]+)\"".toRegex()
+    return regex.find(json)?.groupValues?.get(1)
+        ?: throw GradleException("Could not find download URL in API response: $json")
 }
 // ==========================================================
 
