@@ -5,6 +5,7 @@ import com.customcontentengine.adapter.bukkit.BlockBreakAdapter;
 import com.customcontentengine.adapter.bukkit.BlockPlaceAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitDropAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitWorldMutationAdapter;
+import com.customcontentengine.adapter.bukkit.DebugRegistryCommandAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitItemMetadataAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitMiningVisualAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitToolWearAdapter;
@@ -30,6 +31,8 @@ import com.customcontentengine.application.mechanic.MechanicRuntimeService;
 import com.customcontentengine.application.mechanic.PlayerPreferenceService;
 import com.customcontentengine.application.mechanic.VeinMinerEventTriggerService;
 import com.customcontentengine.application.mechanic.VeinMinerRuntimeService;
+import com.customcontentengine.port.ProtectionPort;
+import com.customcontentengine.port.ToolWearPort;
 import com.customcontentengine.application.mechanic.capability.InMemoryCooldowns;
 import com.customcontentengine.application.mining.InMemoryMiningSessionRepository;
 import com.customcontentengine.application.mining.CustomMiningCompletionService;
@@ -45,11 +48,17 @@ import org.bukkit.command.PluginCommand;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class CustomContentPlugin extends JavaPlugin {
+public class CustomContentPlugin extends JavaPlugin {
     private static final int MINING_MAX_SESSIONS_PER_RUN = 64;
     private static final long MINING_PROCESSING_PERIOD_TICKS = 2L;
 
     private MiningProcessingDriver miningProcessingDriver;
+
+    // Overridable dependencies for integration testing (TestCustomContentPlugin).
+    // When null, the production default implementation is used.
+    protected ToolWearPort toolWearOverride;
+    protected PlayerPreferenceService playerPreferenceServiceOverride;
+    protected ProtectionPort protectionPort;
 
     @Override
     public void onEnable() {
@@ -61,8 +70,12 @@ public final class CustomContentPlugin extends JavaPlugin {
         BukkitItemMetadataAdapter itemMetadata = new BukkitItemMetadataAdapter(this);
         ItemService<ItemStack> itemService = new ItemService<>(registry, itemMetadata);
         BukkitDropAdapter dropPort = new BukkitDropAdapter(itemService);
-        BukkitToolWearAdapter toolWear = new BukkitToolWearAdapter(registry, itemMetadata);
-        PlayerPreferenceService playerPreferences = new PlayerPreferenceService();
+        ToolWearPort toolWear = toolWearOverride != null
+                ? toolWearOverride
+                : new BukkitToolWearAdapter(registry, itemMetadata);
+        PlayerPreferenceService playerPreferences = playerPreferenceServiceOverride != null
+                ? playerPreferenceServiceOverride
+                : new PlayerPreferenceService();
         BlockService blockService = new BlockService(registry, blockStore, dropPort);
         MechanicRegistry mechanicRegistry = new MechanicRegistry(List.of(
                 new AreaBreakMechanic(),
@@ -99,7 +112,7 @@ public final class CustomContentPlugin extends JavaPlugin {
                 scheduler,
                 regionSafety,
                 toolWear,
-                null);
+                protectionPort);
         MechanicRuntimeService mechanicRuntime = new MechanicRuntimeService(
                 mechanicRegistry,
                 registry,
@@ -166,6 +179,11 @@ public final class CustomContentPlugin extends JavaPlugin {
         PluginCommand veinMinerToggleCommand = getCommand("veinminertoggle");
         if (veinMinerToggleCommand != null) {
             veinMinerToggleCommand.setExecutor(new VeinMinerToggleCommandAdapter(playerPreferences));
+        }
+
+        PluginCommand debugRegistryCommand = getCommand("debugregistry");
+        if (debugRegistryCommand != null) {
+            debugRegistryCommand.setExecutor(new DebugRegistryCommandAdapter(registry));
         }
     }
 

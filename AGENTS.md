@@ -1,14 +1,14 @@
 ---
 name: Agente com Consciência de Limites
 description: Agente que opera estritamente dentro do escopo definido, documentando trade-offs, vieses e realocação de complexidade.
-version: 2.1.2
+version: 2.1.3
 ---
 
 # AGENTS.md — Agente com Consciência de Limites para CustomContent Engine
 
 > **Propósito:** Este arquivo define o escopo, padrões, limites e procedimentos operacionais para agentes de IA que atuam no projeto CustomContent Engine.  
 > **Status:** Versão adaptada aos documentos oficiais do projeto (PROJECT_SCOPE.md, ARCHITECTURE_GUARDRAILS.md, ADRs, milestones).  
-> **Data:** 2026-06-25  
+> **Data:** 2026-07-11  
 > **Modelo base:** AGENTS.md v1.2 (adaptado)
 
 ---
@@ -32,8 +32,9 @@ version: 2.1.2
   │   ├── builtin/         # Mecânicas oficiais (não fazem parte do core estável)
   │   ├── bootstrap/       # Ponto de entrada (CustomContentPlugin)
   │   └── ...
-  ├── test/                # Testes unitários e de integração
-  └── integrationTest/     # Testes de integração com Paper
+  ├── test/                # Testes unitários e de arquitetura
+  ├── integrationTest/     # Testes de integração com Paper (obrigatórios para novas mecânicas)
+  └── ...
   ```
 - **Documentação fonte:** `docs/PROJECT_SCOPE.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, `docs/adr/*.md`, `docs/milestones/*.md`.
 
@@ -43,7 +44,7 @@ version: 2.1.2
 
 - **Build do plugin:** `./gradlew build --no-daemon`
 - **Testes unitários:** `./gradlew test --no-daemon`
-- **Testes de integração:** `./gradlew integrationTest --no-daemon`
+- **Testes de integração (Paper):** `./gradlew integrationTest --no-daemon`
 - **Executar todos (build + testes):** `./gradlew test build integrationTest --no-daemon`
 - **Limpar cache:** `./gradlew clean`
 - **Gerar relatório de cobertura:** `./gradlew jacocoTestReport` (se configurado)
@@ -166,6 +167,21 @@ O Tessera está disponível para **todo o código-fonte** do projeto. No entanto
 - **Como rodar testes de integração:** `./gradlew integrationTest --no-daemon` (requer um ambiente com Paper ou os JARs corretos configurados via propriedades).
 - **Fonte de verdade:** GitHub Actions. Não confiar em execuções locais para validação final.
 
+### 4.1. Estratégia de Integração Obrigatória (ADR-0013)
+
+Conforme formalizado no **ADR-0013 (Test Integration Strategy)**, os testes de integração com Paper são **obrigatórios** para:
+- Validação de novas mecânicas oficiais (ex: `vein_miner`, `block_transform`).
+- Validação de interações com o `PersistentDataContainer`, `SchedulerPort` e eventos do Bukkit/Paper.
+- Garantia de que o comportamento em um servidor real corresponde ao esperado pelos testes unitários.
+
+**Regras operacionais para agentes e desenvolvedores:**
+
+1. **Toda nova mecânica oficial (oficial module) deve incluir, no mínimo, um teste de integração Paper** que valide seu fluxo principal (execução, resultado e efeitos colaterais no mundo/inventário).
+2. **Os testes de integração devem estender a classe base** `BasePaperIntegrationTest` (localizada em `src/integrationTest/java/com/customcontentengine/integration/base/`), que gerencia o ciclo de vida do servidor e fornece utilitários padronizados.
+3. **Para testes que exigem dependências falsas** (ex: `ProtectionPort`, `ToolWearPort`), utilize `TestCustomContentPlugin` (que estende `CustomContentPlugin`) para sobrescrever as dependências via setters (`setProtectionPort`, `setToolWearPort`) **antes** da inicialização do plugin.
+4. **O plano de implementação detalhado** (fases 0 a 4) está documentado em `docs/TEST_INTEGRATION_PLAN.md`. Consulte-o para entender a ordem de prioridade e os cenários específicos.
+5. **Em CI (GitHub Actions):** A falha em qualquer teste de integração bloqueia o merge do PR. O timeout por suíte é de 10 minutos.
+
 ---
 
 ## 🔒 5. CONSIDERAÇÕES DE SEGURANÇA
@@ -193,7 +209,7 @@ O Tessera está disponível para **todo o código-fonte** do projeto. No entanto
 
 - **Título:** Segue formato de commit.
 - **Descrição obrigatória:**
-  ```markdown
+
   ## O que foi feito?
   - [Lista de mudanças]
   
@@ -210,7 +226,8 @@ O Tessera está disponível para **todo o código-fonte** do projeto. No entanto
   - [ ] GitHub Actions passou (build, test, integrationTest)
   - [ ] Arquitetura fitness (ArchUnit) passou
   - [ ] Documentação atualizada (se necessário)
-  ```
+  - [ ] Testes de integração Paper adicionados/atualizados (conforme ADR-0013)
+
 - **Tamanho:** Preferir PRs com menos de 400 linhas alteradas. Mudanças maiores devem ser divididas em múltiplos PRs.
 - **Revisão:** Pelo menos 1 aprovação de mantenedor.
 
@@ -224,7 +241,7 @@ O Tessera está disponível para **todo o código-fonte** do projeto. No entanto
 - Implementação de **mecânicas oficiais** (ex: `area_break`, `block_transform`) como módulos, não como core estável.
 - Uso de **capacidades oficiais** (`BLOCK_PLACEMENT`, `MECHANIC_CONFIG`) em mecânicas que precisam de argumentos ou colocação de blocos.
 - Refatorações que preservem a **arquitetura hexagonal** e a **pureza do domínio**.
-- Escrita de testes unitários e de integração para novas funcionalidades.
+- Escrita de testes unitários e de integração para novas funcionalidades (os de integração são **obrigatórios** para mecânicas oficiais, conforme ADR-0013).
 - Correção de bugs identificados, desde que alinhados com os guardrails.
 - Atualização de documentação (ADRs, milestones, guardrails) com supervisão.
 
@@ -271,7 +288,7 @@ O Tessera está disponível para **todo o código-fonte** do projeto. No entanto
 | Critério | Prioridade (1 a 5) | Tolerância / Observação |
 | :--- | :--- | :--- |
 | **Legibilidade** | 5 | Máxima — código autoexplicativo e documentado |
-| **Testabilidade** | 5 | Obrigatório: testes unitários para domínio e aplicação |
+| **Testabilidade** | 5 | Obrigatório: testes unitários para domínio e aplicação; **testes de integração Paper para mecânicas oficiais (ADR-0013)** |
 | **Segurança** | 4 | Tolerância zero para vazamento de Bukkit/Paper em domínio |
 | **Performance (CPU/IO)** | 3 | Tolerar até 15% de overhead se trouxer ganho de legibilidade |
 | **Tamanho do código** | 2 | Pode ser verboso se clarear a lógica |
@@ -371,6 +388,7 @@ Ao receber qualquer tarefa, siga **estes 5 passos obrigatórios**:
 - `2026-06-25 (v2.1)`: Integração oficial do Tessera para navegação determinística de código (item 3.5).
 - `2026-06-25 (v2.1.1)`: Integração oficial do Tessera para navegação determinística de código (item 3.5).
 - `2026-06-25 (v2.1.2)`: Adição do MCFAST-MCP como MCP secundário para edição AST-aware de arquivos, complementando o Tessera.
+- `2026-07-11 (v2.1.3)`: **Incorporação do ADR-0013 (Test Integration Strategy).** Adicionada a obrigatoriedade de testes de integração Paper para novas mecânicas oficiais, criação da `BasePaperIntegrationTest` e do `TestCustomContentPlugin` para injeção de dependências em testes. Atualização das seções 4 (Testes) e 6 (PR Checklist).
 
 ---
 
@@ -392,7 +410,9 @@ Ao receber qualquer tarefa, siga **estes 5 passos obrigatórios**:
 - `docs/milestones/*.md` — Marcos completos e planejados.
 - `docs/AI_CONTEXT_PACK.md` — Resumo derivado (não substitui os documentos fonte).
 - `docs/MCFAST_GUIDE.md` (opcional) — Guia detalhado de uso do MCFAST-MCP (caso criado).
+- **`docs/adr/0013-test-integration-strategy.md`** — Estratégia formal de testes de integração (obrigatória para novas mecânicas).
+- **`docs/TEST_INTEGRATION_PLAN.md`** — Plano de implementação detalhado (fases 0 a 4) para os testes de integração.
 
 ---
 
-**Fim do AGENTS.md — v2.1.2 (CustomContent Engine com Tessera obrigatório, MCFAST para edição AST-aware e reindexação automatizada)**
+**Fim do AGENTS.md — v2.1.3 (CustomContent Engine com ADR-0013 integrado e obrigatoriedade de testes de integração Paper)**

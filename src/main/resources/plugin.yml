@@ -13,3 +13,6 @@ commands:
   veinminertoggle:
     description: Toggle the vein_miner mechanic for the calling player.
     usage: /veinminertoggle
+  debugregistry:
+    description: Dev tool that dumps registered item to mechanic bindings.
+    usage: /debugregistry

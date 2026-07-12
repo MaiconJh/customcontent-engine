@@ -3,186 +3,30 @@ package com.customcontentengine.integration;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.ServerSocket;
-import java.nio.charset.StandardCharsets;
+import com.customcontentengine.integration.base.BasePaperIntegrationTest;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
-import java.util.stream.Stream;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-class PaperPluginSmokeIntegrationTest {
-    private static final Duration SERVER_START_TIMEOUT = Duration.ofMinutes(6);
-    private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(30);
+class PaperPluginSmokeIntegrationTest extends BasePaperIntegrationTest {
 
     @Test
+    @Tag("smoke")
     void paperServerLoadsPluginDefinitionsAndDebugCommand() throws Exception {
-        Path pluginJar = requiredPathProperty("customcontent.pluginJar");
-        Path paperJar = requiredPathProperty("customcontent.paperJar");
-        Path serverDirectory = Files.createTempDirectory("customcontent-paper-it-");
+        assertTrue(server.outputContains("Enabling CustomContentEngine"), server::fullOutput);
+        assertFalse(
+                server.outputContains("Error occurred while enabling CustomContentEngine"),
+                server::fullOutput);
+        assertTrue(
+                Files.isRegularFile(
+                        serverDirectory().resolve("plugins/CustomContentEngine/definitions.yml")),
+                "definitions.yml should be copied to the plugin data folder");
 
-        try {
-            prepareServerDirectory(serverDirectory, pluginJar);
-            try (PaperServer server = PaperServer.start(serverDirectory, paperJar)) {
-                server.awaitOutput(line -> line.contains("Done ("), SERVER_START_TIMEOUT);
+        sendCommand("givecustomitem");
+        awaitOutput(
+                line -> line.contains("Only players can use this debug command."),
+                COMMAND_TIMEOUT);
 
-                assertTrue(server.outputContains("Enabling CustomContentEngine"), server::fullOutput);
-                assertFalse(server.outputContains("Error occurred while enabling CustomContentEngine"), server::fullOutput);
-                assertTrue(
-                        Files.isRegularFile(serverDirectory.resolve("plugins/CustomContentEngine/definitions.yml")),
-                        "definitions.yml should be copied to the plugin data folder");
-
-                server.sendCommand("givecustomitem");
-                server.awaitOutput(
-                        line -> line.contains("Only players can use this debug command."),
-                        COMMAND_TIMEOUT);
-            }
-        } finally {
-            deleteRecursively(serverDirectory);
-        }
-    }
-
-    private static Path requiredPathProperty(String propertyName) {
-        String value = System.getProperty(propertyName);
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Missing required system property: " + propertyName);
-        }
-        return Path.of(value);
-    }
-
-    private static void prepareServerDirectory(Path serverDirectory, Path pluginJar) throws IOException {
-        Files.writeString(serverDirectory.resolve("eula.txt"), "eula=true%n".formatted(), StandardCharsets.UTF_8);
-        Files.writeString(
-                serverDirectory.resolve("server.properties"),
-                """
-                online-mode=false
-                server-port=%d
-                query.port=%d
-                enable-query=false
-                spawn-protection=0
-                view-distance=2
-                simulation-distance=2
-                generate-structures=false
-                level-type=minecraft:flat
-                """.formatted(freePort(), freePort()),
-                StandardCharsets.UTF_8);
-        Path pluginsDirectory = Files.createDirectories(serverDirectory.resolve("plugins"));
-        Files.copy(pluginJar, pluginsDirectory.resolve("CustomContentEngine.jar"));
-    }
-
-    private static int freePort() throws IOException {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
-        }
-    }
-
-    private static void deleteRecursively(Path path) throws IOException {
-        if (!Files.exists(path)) {
-            return;
-        }
-        try (Stream<Path> paths = Files.walk(path)) {
-            List<Path> orderedPaths = paths.sorted(Comparator.reverseOrder()).toList();
-            for (Path current : orderedPaths) {
-                Files.deleteIfExists(current);
-            }
-        }
-    }
-
-    private static final class PaperServer implements AutoCloseable {
-        private final Process process;
-        private final BufferedWriter input;
-        private final List<String> outputLines = new CopyOnWriteArrayList<>();
-        private final Thread outputReader;
-
-        private PaperServer(Process process) {
-            this.process = process;
-            this.input = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
-            this.outputReader = new Thread(this::readOutput, "paper-integration-output-reader");
-            this.outputReader.setDaemon(true);
-            this.outputReader.start();
-        }
-
-        private static PaperServer start(Path serverDirectory, Path paperJar) throws IOException {
-            ProcessBuilder builder = new ProcessBuilder(
-                    javaExecutable(),
-                    "-Xms512M",
-                    "-Xmx1G",
-                    "-jar",
-                    paperJar.toAbsolutePath().toString(),
-                    "--nogui");
-            builder.directory(serverDirectory.toFile());
-            builder.redirectErrorStream(true);
-            return new PaperServer(builder.start());
-        }
-
-        private void awaitOutput(Predicate<String> predicate, Duration timeout) throws InterruptedException {
-            long deadline = System.nanoTime() + timeout.toNanos();
-            while (System.nanoTime() < deadline) {
-                if (outputLines.stream().anyMatch(predicate)) {
-                    return;
-                }
-                if (!process.isAlive()) {
-                    throw new AssertionError("Paper server exited before expected output.%n%s".formatted(fullOutput()));
-                }
-                Thread.sleep(100);
-            }
-            throw new AssertionError("Timed out waiting for Paper server output.%n%s".formatted(fullOutput()));
-        }
-
-        private void sendCommand(String command) throws IOException {
-            input.write(command);
-            input.newLine();
-            input.flush();
-        }
-
-        private boolean outputContains(String text) {
-            return outputLines.stream().anyMatch(line -> line.contains(text));
-        }
-
-        private String fullOutput() {
-            return String.join(System.lineSeparator(), outputLines);
-        }
-
-        private void readOutput() {
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    outputLines.add(line);
-                    System.out.println("[paper-it] " + line);
-                }
-            } catch (IOException exception) {
-                outputLines.add("Output reader failed: " + exception.getMessage());
-            }
-        }
-
-        @Override
-        public void close() throws Exception {
-            if (process.isAlive()) {
-                sendCommand("stop");
-                if (!process.waitFor(30, TimeUnit.SECONDS)) {
-                    process.destroyForcibly();
-                    process.waitFor(10, TimeUnit.SECONDS);
-                }
-            }
-        }
-
-        private static String javaExecutable() {
-            String executable = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")
-                    ? "java.exe"
-                    : "java";
-            return Path.of(System.getProperty("java.home"), "bin", executable).toString();
-        }
+        assertRegistryContains("ruby_pickaxe", "area_break");
     }
 }

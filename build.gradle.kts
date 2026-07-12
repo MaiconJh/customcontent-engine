@@ -115,6 +115,22 @@ tasks.register<Test>("integrationTest") {
     }
 }
 
+tasks.register<Test>("integrationTestSmoke") {
+    description = "Runs the critical-path Paper integration tests (Phases 0-1). Execute with ./gradlew integrationTestSmoke --no-daemon."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    testClassesDirs = integrationTest.output.classesDirs
+    classpath = integrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    dependsOn(tasks.named<Jar>("jar"), downloadPaperServer)
+    useJUnitPlatform {
+        includeTags("smoke", "mining", "mechanic")
+    }
+    doFirst {
+        systemProperty("customcontent.pluginJar", tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)
+        systemProperty("customcontent.paperJar", paperServerJar.get().asFile.absolutePath)
+    }
+}
+
 // ========== SPIKE TASKS ==========
 
 tasks.register<JavaExec>("binaryPdcSpike") {
