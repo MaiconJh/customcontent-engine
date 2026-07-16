@@ -167,9 +167,25 @@ class CustomMiningCompletionServiceTest {
         assertEquals(1, dropPort.positions.stream().filter(TARGET::equals).count());
     }
 
+    @Test
+    void worldMutationFailureReturnsFailedAndStopsPipeline() {
+        FakeBlockStore blockStore = new FakeBlockStore(Optional.of((short) 1));
+        FailingWorldMutation worldMutation = new FailingWorldMutation();
+        CapturingDropPort dropPort = new CapturingDropPort();
+        MechanicEventTriggerService triggerService = mock(MechanicEventTriggerService.class);
+        CustomMiningCompletionService service = service(blockStore, worldMutation, dropPort, position -> true, triggerService);
+
+        MiningCompletionPort.CompletionResult result = service.complete(request(TOOL_ID));
+
+        assertEquals(MiningCompletionPort.CompletionStatus.FAILED, result.status());
+        assertEquals(1, blockStore.removed.size());
+        assertEquals(0, dropPort.positions.size());
+        verifyNoInteractions(triggerService);
+    }
+
     private static CustomMiningCompletionService service(
             FakeBlockStore blockStore,
-            CapturingWorldMutation worldMutation,
+            WorldMutationPort worldMutation,
             CapturingDropPort dropPort,
             RegionSafetyPort regionSafety,
             MechanicEventTriggerService triggerService) {
@@ -306,6 +322,13 @@ class CustomMiningCompletionServiceTest {
         @Override
         public void runOnRegion(WorldPosition position, Runnable task) {
             task.run();
+        }
+    }
+
+    private static final class FailingWorldMutation implements WorldMutationPort {
+        @Override
+        public void setBlockMaterial(WorldPosition position, String materialBase) {
+            throw new RuntimeException("Simulated world mutation failure");
         }
     }
 }

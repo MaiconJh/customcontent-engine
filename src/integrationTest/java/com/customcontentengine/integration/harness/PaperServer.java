@@ -69,6 +69,10 @@ public final class PaperServer implements AutoCloseable {
     }
 
     public static PaperServer start(Path serverDirectory, Path paperJar) throws IOException {
+        return start(serverDirectory, paperJar, java.util.Map.of());
+    }
+
+    public static PaperServer start(Path serverDirectory, Path paperJar, java.util.Map<String, String> systemProperties) throws IOException {
         ProcessBuilder builder = new ProcessBuilder(
                 javaExecutable(),
                 "-Xms512M",
@@ -78,6 +82,8 @@ public final class PaperServer implements AutoCloseable {
                 "--nogui");
         builder.directory(serverDirectory.toFile());
         builder.redirectErrorStream(true);
+        java.util.Map<String, String> environment = builder.environment();
+        environment.putAll(systemProperties);
         return new PaperServer(builder.start());
     }
 
@@ -103,6 +109,10 @@ public final class PaperServer implements AutoCloseable {
 
     public boolean outputContains(String text) {
         return outputLines.stream().anyMatch(line -> line.contains(text));
+    }
+
+    public void clearOutput() {
+        outputLines.clear();
     }
 
     public String fullOutput() {

@@ -1,0 +1,31 @@
+name: CustomContentEngine
+main: com.customcontentengine.integration.TestCustomContentPlugin
+version: 0.1.0-SNAPSHOT
+api-version: "1.21"
+author: CustomContent Engine
+permissions:
+  customcontent.debug:
+    description: Allows use of internal debug commands.
+    default: op
+commands:
+  givecustomitem:
+    description: Debug command to give a custom item.
+    usage: /givecustomitem <id>
+  debugareabreak:
+    description: Internal debug command to execute area_break against the targeted block.
+    usage: /debugareabreak
+  veinminertoggle:
+    description: Toggle the vein_miner mechanic for the calling player.
+    usage: /veinminertoggle
+  debugregistry:
+    description: Dev tool that dumps registered item to mechanic bindings.
+    usage: /debugregistry
+  debugplace:
+    description: Dev tool for integration tests – place a custom block at a position.
+    usage: /debugplace <blockId> <x> <y> <z> [world]
+  debugmine:
+    description: Dev tool for integration tests – start mining a custom block.
+    usage: /debugmine <toolId> <x> <y> <z> [world]
+  debugquery:
+    description: Dev tool for integration tests – inspect a position.
+    usage: /debugquery <x> <y> <z> [world]

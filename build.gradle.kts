@@ -5,6 +5,7 @@ import org.gradle.jvm.tasks.Jar
 plugins {
     java
     id("me.champeau.jmh") version "0.7.2"  // JMH plugin
+    id("jacoco")
 }
 
 group = "com.customcontentengine"
@@ -14,16 +15,6 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
-}
-
-dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
-
-    testImplementation(platform("org.junit:junit-bom:5.11.4"))
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("org.mockito:mockito-core:5.14.2")
-    testImplementation("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
 }
 
 // ========== SOURCE SETS ==========
@@ -43,6 +34,27 @@ val spike by sourceSets.creating {
 
 configurations[integrationTest.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
 configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
+
+dependencies {
+    compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
+
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
+
+    add("integrationTestImplementation", platform("org.junit:junit-bom:5.11.4"))
+    add("integrationTestImplementation", "org.junit.jupiter:junit-jupiter")
+    add("integrationTestRuntimeOnly", "org.junit.jupiter:junit-jupiter-engine")
+
+    testImplementation("org.jacoco:org.jacoco.core:0.8.12")
+    add("integrationTestImplementation", "org.jacoco:org.jacoco.core:0.8.12")
+}
+
+tasks.named<ProcessResources>("processIntegrationTestResources") {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
 
 // ========== PAPER SERVER DOWNLOAD ==========
 
@@ -106,11 +118,11 @@ tasks.register<Test>("integrationTest") {
     testClassesDirs = integrationTest.output.classesDirs
     classpath = integrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
-    dependsOn(tasks.named<Jar>("jar"), downloadPaperServer)
+    dependsOn(tasks.named("integrationTestPluginJar"), downloadPaperServer)
     useJUnitPlatform()
 
     doFirst {
-        systemProperty("customcontent.pluginJar", tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)
+        systemProperty("customcontent.pluginJar", tasks.named<Jar>("integrationTestPluginJar").get().archiveFile.get().asFile.absolutePath)
         systemProperty("customcontent.paperJar", paperServerJar.get().asFile.absolutePath)
     }
 }
@@ -121,14 +133,24 @@ tasks.register<Test>("integrationTestSmoke") {
     testClassesDirs = integrationTest.output.classesDirs
     classpath = integrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
-    dependsOn(tasks.named<Jar>("jar"), downloadPaperServer)
+    dependsOn(tasks.named("integrationTestPluginJar"), downloadPaperServer)
     useJUnitPlatform {
         includeTags("smoke", "mining", "mechanic")
     }
     doFirst {
-        systemProperty("customcontent.pluginJar", tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)
+        systemProperty("customcontent.pluginJar", tasks.named<Jar>("integrationTestPluginJar").get().archiveFile.get().asFile.absolutePath)
         systemProperty("customcontent.paperJar", paperServerJar.get().asFile.absolutePath)
     }
+}
+
+val integrationTestPluginJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("integration-test")
+    from(project.sourceSets.main.get().output) {
+        exclude("plugin.yml")
+    }
+    from(integrationTest.output)
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    dependsOn(tasks.named<Jar>("jar"))
 }
 
 // ========== SPIKE TASKS ==========
@@ -171,6 +193,32 @@ jmh {
 
 // Optional: task to run JMH benchmarks explicitly (already provided by the plugin)
 // You can run: ./gradlew jmh
+
+// ========== JACOCO COVERAGE ==========
+
+tasks.test {
+    useJUnitPlatform()
+    finalizedBy("jacocoTestReport")
+}
+
+tasks.named<Test>("integrationTest") {
+    useJUnitPlatform()
+    finalizedBy("jacocoTestReport")
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.test, tasks.named<Test>("integrationTest"))
+    executionData.setFrom(fileTree(layout.buildDirectory).include("jacoco/*.exec"))
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.named("jacocoTestReport"))
+}
 
 // ========== CONVENIENCE TASK ==========
 

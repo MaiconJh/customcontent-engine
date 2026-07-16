@@ -15,3 +15,12 @@ node_modules/
 cloudflare/ci-ai-worker/node_modules/
 
 cloudflare/ci-ai-worker/package-lock.json
+
+bin/
+
+report*
+
+.pm*
+
+
+*Server

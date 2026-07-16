@@ -1,41 +1,3 @@
----
-name: Agente com Consciência de Limites
-description: Agente que opera estritamente dentro do escopo definido, documentando trade-offs, vieses e realocação de complexidade.
-version: 2.1.3
----
-
-# AGENTS.md — Agente com Consciência de Limites para CustomContent Engine
-
-> **Propósito:** Este arquivo define o escopo, padrões, limites e procedimentos operacionais para agentes de IA que atuam no projeto CustomContent Engine.  
-> **Status:** Versão adaptada aos documentos oficiais do projeto (PROJECT_SCOPE.md, ARCHITECTURE_GUARDRAILS.md, ADRs, milestones).  
-> **Data:** 2026-07-11  
-> **Modelo base:** AGENTS.md v1.2 (adaptado)
-
----
-
-## 🎯 1. VISÃO GERAL DO PROJETO (Project Overview)
-
-- **Nome do Projeto:** CustomContent Engine
-- **Linguagem principal:** Java 21
-- **Plataforma:** Paper 1.21+ (Folia como objetivo arquitetural, não como promessa final)
-- **Ferramentas de build:** Gradle (Gradle Wrapper)
-- **Arquitetura:** Hexagonal (Ports & Adapters) com domínio puro, aplicação orquestradora, adaptadores de infraestrutura e bootstrap como ponto de composição.
-- **Estrutura de pastas:**
-  ```
-  src/
-  ├── main/java/com/customcontentengine/
-  │   ├── domain/          # Regras de negócio puras (sem dependências externas)
-  │   ├── internalapi/     # Contratos internos (não públicos)
-  │   ├── application/     # Casos de uso e orquestração
-  │   ├── port/            # Interfaces de inversão de dependência
-  │   ├── adapter/         # Implementações de infraestrutura (Bukkit, Paper, PDC, YAML)
-  │   ├── builtin/         # Mecânicas oficiais (não fazem parte do core estável)
-  │   ├── bootstrap/       # Ponto de entrada (CustomContentPlugin)
-  │   └── ...
-  ├── test/                # Testes unitários e de arquitetura
-  ├── integrationTest/     # Testes de integração com Paper (obrigatórios para novas mecânicas)
-  └── ...
-  ```
 - **Documentação fonte:** `docs/PROJECT_SCOPE.md`, `docs/ARCHITECTURE_GUARDRAILS.md`, `docs/adr/*.md`, `docs/milestones/*.md`.
 
 ---
@@ -44,7 +6,7 @@ version: 2.1.3
 
 - **Build do plugin:** `./gradlew build --no-daemon`
 - **Testes unitários:** `./gradlew test --no-daemon`
-- **Testes de integração (Paper):** `./gradlew integrationTest --no-daemon`
+- **Testes de integração (Paper):** `./gradlew integrationTest --no-daemon` (requer `-Dcustomcontent.paperJar=<caminho>`)
 - **Executar todos (build + testes):** `./gradlew test build integrationTest --no-daemon`
 - **Limpar cache:** `./gradlew clean`
 - **Gerar relatório de cobertura:** `./gradlew jacocoTestReport` (se configurado)
@@ -63,9 +25,9 @@ version: 2.1.3
 - **Imutabilidade:** Preferir `record` para objetos de valor (ex: `WorldPosition`, `CustomBlockId`). Classes devem ser imutáveis sempre que possível.
 - **Tipagem explícita:** Usar tipos genéricos e interfaces claras.
 - **Nomenclatura:**
-  - Pacotes: `com.customcontentengine.<layer>.<subpacote>` (ex: `domain.mining`, `adapter.bukkit`)
-  - Classes: `PascalCase`; métodos e variáveis: `camelCase`.
-  - Constantes: `UPPER_SNAKE_CASE`.
+- Pacotes: `com.customcontentengine.<layer>.<subpacote>` (ex: `domain.mining`, `adapter.bukkit`)
+- Classes: `PascalCase`; métodos e variáveis: `camelCase`.
+- Constantes: `UPPER_SNAKE_CASE`.
 - **Imports:** Ordenar: `java.*`, `javax.*`, bibliotecas de terceiros (org.bukkit, io.papermc, etc.), `com.customcontentengine.*`.
 - **Documentação:** Usar Javadoc para interfaces públicas (internas). Comentários em linha apenas quando a lógica não for óbvia.
 - **Evitar:** Reflexão, NMS (`net.minecraft`), `Class.forName`, `ThreadLocal` como modelo arquitetural.
@@ -88,20 +50,20 @@ O projeto possui o **Tessera** integrado via MCP. **Antes de qualquer operação
 | Ferramenta | Uso obrigatório em |
 | :--- | :--- |
 | `validate` | **Sempre** antes de referenciar um símbolo no código. |
-| `find_definition` | Para saber onde um símbolo é definido (arquivo + linha). |
+| `find-definition` | Para saber onde um símbolo é definido (arquivo + linha). |
 | `impact` | Antes de modificar qualquer função/método público. |
-| `context_pack` | **Preferencial** para obter corpo, dependências, chamadores e testes de um símbolo em uma única chamada. |
+| `context-pack` | **Preferencial** para obter corpo, dependências, chamadores e testes de um símbolo em uma única chamada. |
 | `search` | Para encontrar símbolos por padrão (glob/fuzzy) quando não se sabe o nome exato. |
-| `find_references` | Para listar todos os usos de um símbolo. |
+| `find-references` | Para listar todos os usos de um símbolo. |
 | `connect` | Para traçar caminhos de chamada entre dois símbolos. |
 
 #### Regras de Ouro
 
-1. **Nunca** use `read` para encontrar uma definição — use `find_definition`.
-2. **Nunca** use `grep` para achar chamadores — use `find_references` ou `impact`.
+1. **Nunca** use `read` para encontrar uma definição — use `find-definition`.
+2. **Nunca** use `grep` para achar chamadores — use `find-references` ou `impact`.
 3. **Nunca** escreva código que referencie um símbolo sem antes `validate`-lo.
-4. **Prefira `context_pack`** a múltiplas chamadas separadas (é mais barato em tokens).
-5. **Evite `get_outline` em diretórios grandes** — prefira `search` ou `context_pack` para alvos específicos. `get_outline` só deve ser usado para arquivos individuais ou diretórios com poucos símbolos.
+4. **Prefira `context-pack`** a múltiplas chamadas separadas (é mais barato em tokens).
+5. **Evite `get-outline` em diretórios grandes** — prefira `search` ou `context-pack` para alvos específicos. `get-outline` só deve ser usado para arquivos individuais ou diretórios com poucos símbolos.
 6. **Reindexe após criar ou renomear arquivos** (`tessera index .`) — senão o grafo fica desatualizado.
 
 #### Fluxo Obrigatório para Qualquer Tarefa
@@ -109,45 +71,74 @@ O projeto possui o **Tessera** integrado via MCP. **Antes de qualquer operação
 Ao receber uma tarefa que envolva modificar ou entender código, siga **rigorosamente** este fluxo:
 
 1. **Mapeamento inicial**:
-   - Use `validate` para confirmar que os símbolos mencionados existem.
-   - Use `find_definition` para obter localização e assinatura dos símbolos alvo.
-   - Use `impact` para listar todos os chamadores afetados (se for refatoração).
+ - Use `validate` para confirmar que os símbolos mencionados existem.
+ - Use `find-definition` para obter localização e assinatura dos símbolos alvo.
+ - Use `impact` para listar todos os chamadores afetados (se for refatoração).
 
 2. **Obtenção de contexto**:
-   - Use `context_pack` no(s) símbolo(s) principal(is) para obter corpo, dependências e chamadores em uma chamada.
-   - Se precisar de visão de um pacote, use `search` com padrão (ex: `search '*Service' --kind class`) em vez de `get_outline` no diretório inteiro.
+ - Use `context-pack` no(s) símbolo(s) principal(is) para obter corpo, dependências e chamadores em uma chamada.
+ - Se precisar de visão de um pacote, use `search` com padrão (ex: `search '*Service' --kind class`) em vez de `get-outline` no diretório inteiro.
 
 3. **Plano de edição**:
-   - Com base nas informações do Tessera, liste os arquivos que precisam ser editados.
-   - **Só então** use `read` para ler **apenas as partes específicas** necessárias (ex: trechos de 10-20 linhas), não o arquivo inteiro.
+ - Com base nas informações do Tessera, liste os arquivos que precisam ser editados.
+ - **Só então** use `read` para ler **apenas as partes específicas** necessárias (ex: trechos de 10-20 linhas), não o arquivo inteiro.
 
 4. **Execução**:
-   - Realize as edições com `edit`.
-   - **Após criar novos arquivos ou renomear símbolos**, execute `tessera index .` (o agente pode pedir para o usuário rodar, ou rodar via terminal integrado se tiver permissão).
+ - Realize as edições com `edit`.
+ - **Após criar novos arquivos ou renomear símbolos**, execute `tessera index .` (o agente pode pedir para o usuário rodar, ou rodar via terminal integrado se tiver permissão).
 
 5. **Validação pós-edição**:
-   - Use `validate` novamente para confirmar que os novos símbolos foram indexados.
-   - Use `impact` para verificar se a mudança não quebrou chamadores inesperados.
+ - Use `validate` novamente para confirmar que os novos símbolos foram indexados.
+ - Use `impact` para verificar se a mudança não quebrou chamadores inesperados.
 
-#### Exemplo prático
+#### Tratamento de Erros e Fallback
+
+O agente deve estar preparado para situações em que o Tessera não esteja disponível ou falhe. Nesses casos, siga estas diretrizes:
+
+1. **Verificação de disponibilidade:** Antes de iniciar o fluxo, o agente pode verificar se o Tessera está instalado e se o índice existe. Se não, deve:
+ - Informar o usuário sobre a necessidade de instalar o Tessera (`npm i -g tessera-codegraph`) e indexar o repositório (`tessera index .`).
+ - **Não** tentar usar `grep` ou `read` como fallback imediato — isso violaria as regras de economia de tokens e precisão. Em vez disso, solicitar ao usuário que execute os comandos necessários e aguardar.
+
+2. **Falhas de comando:** Se um comando do Tessera falhar (ex: `validate` retorna erro), o agente deve:
+ - Registrar o erro e tentar novamente uma vez (pode ser um problema transitório).
+ - Se a falha persistir, informar o usuário com o erro exato e sugerir a reindexação (`tessera index .`) ou verificar a instalação.
+ - **Não** prosseguir com a tarefa até que o problema seja resolvido, a menos que o usuário autorize explicitamente o uso de métodos alternativos (o que deve ser registrado como exceção).
+
+3. **Ambiente Windows/PowerShell:** O agente **não deve** usar comandos Unix-like (`head`, `tail`, `grep`, `ls`) em scripts ou ao interagir com o sistema. Em vez disso, deve:
+ - Usar apenas os comandos do Tessera (que são independentes de plataforma) para navegação.
+ - Se precisar listar diretórios ou arquivos, usar comandos compatíveis com PowerShell (`Get-ChildItem`, `Select-Object -First N`) ou, preferencialmente, as ferramentas de busca do Tessera (`search`, `context-pack`).
+
+4. **Falha na validação de símbolos:** Se `validate` retornar negativo para um símbolo que o agente acredita existir, ele deve:
+ - Verificar a grafia (pode ser um erro de digitação).
+ - Usar `search` com um padrão aproximado para encontrar o símbolo real.
+ - Se o símbolo realmente não existir, informar ao usuário e ajustar o plano.
+
+5. **Índice desatualizado:** Se um `validate` falhar para um símbolo recém-criado, o agente deve:
+ - Solicitar reindexação (`tessera index .`).
+ - Repetir a validação.
+ - Se ainda falhar, reportar como possível erro de indexação.
+
+#### Exemplo prático com tratamento de erros
 
 **Tarefa:** *"Adicionar um novo método `getCustomBlock` na classe `CustomBlockService`."*
 
 **Comportamento esperado do agente:**
-- ✅ `validate CustomBlockService` → confirma que existe.
-- ✅ `find_definition CustomBlockService` → obtém assinatura e localização.
-- ✅ `impact getCustomBlock` (se já existir) → verifica conflito de nome.
-- ✅ `context_pack CustomBlockService` → obtém corpo, dependências e chamadores.
-- ✅ Só então gera o código e propõe `edit` no arquivo.
-- ✅ Após criar o método, sugere `tessera index .` para atualizar o grafo.
+- ✅ `validate CustomBlockService` → se falhar, pedir reindexação.
+- ✅ `find-definition CustomBlockService` → obtém localização.
+- ✅ `impact getCustomBlock` (se já existir) → verifica conflito.
+- ✅ `context-pack CustomBlockService` → obtém corpo e dependências.
+- ✅ Só então gera o código e propõe `edit`.
+- ✅ Após criar o método, sugere `tessera index .` e valida novamente.
+- ❌ Se `tessera` não estiver instalado, interrompe e pede instalação.
+- ❌ Se ocorrer erro no PowerShell (ex: comando `head`), usa apenas comandos Tessera ou pede ajuda.
 
 #### Gerenciamento do Índice (Reindexação)
 
 - O índice é **incremental** e rápido (ms). Pode ser executado a qualquer momento.
 - O agente **deve** sugerir reindexação sempre que:
-  - Criar um novo arquivo.
-  - Renomear uma classe, método ou pacote.
-  - Mudar a assinatura de um método público.
+- Criar um novo arquivo.
+- Renomear uma classe, método ou pacote.
+- Mudar a assinatura de um método público.
 - Se um `validate` falhar para um símbolo que o agente **acabou de criar**, é sinal de que o índice está desatualizado — o agente deve reindexar e repetir a validação.
 
 #### Nota sobre o escopo
@@ -164,7 +155,7 @@ O Tessera está disponível para **todo o código-fonte** do projeto. No entanto
 - **Cobertura mínima:** 80% para novas funcionalidades (quando aplicável).
 - **O que mockar:** Bukkit/Paper APIs, `PersistentDataContainer`, `World`, `Player`. Usar Mockito.
 - **O que NÃO mockar:** Lógica de domínio pura (deve ser testada com objetos reais). Capabilities devem ser testadas com fakes.
-- **Como rodar testes de integração:** `./gradlew integrationTest --no-daemon` (requer um ambiente com Paper ou os JARs corretos configurados via propriedades).
+- **Como rodar testes de integração:** `./gradlew integrationTest --no-daemon` (requer `-Dcustomcontent.paperJar=<caminho>`).
 - **Fonte de verdade:** GitHub Actions. Não confiar em execuções locais para validação final.
 
 ### 4.1. Estratégia de Integração Obrigatória (ADR-0013)
@@ -199,37 +190,141 @@ Conforme formalizado no **ADR-0013 (Test Integration Strategy)**, os testes de i
 
 ### Commits
 
-- **Formato:** `tipo(escopo): mensagem curta`
-- **Tipos:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`
-- **Escopo:** Ex: `mining`, `mechanic`, `adapter`, `domain`, `docs`
-- **Exemplo:** `feat(mining): adiciona suporte a tiers de ferramentas`
-- **Corpo:** Explicar o "porquê" e referenciar ADR ou issue, se aplicável.
+#### Formato
+
+Os commits devem seguir o padrão **Conventional Commits** (inspirado em [conventionalcommits.org](https://www.conventionalcommits.org/)):
+
+```
+<tipo>(<escopo opcional>): <descrição curta em imperativo presente>
+
+[corpo opcional explicando o "porquê" da mudança]
+
+[rodapé opcional com referências a issues, breaking changes, etc.]
+```
+
+#### Tipos permitidos
+
+| Tipo | Uso |
+| :--- | :--- |
+| `feat` | Nova funcionalidade para o usuário final (ex: nova mecânica, novo comando) |
+| `fix` | Correção de bug |
+| `docs` | Mudanças apenas na documentação |
+| `refactor` | Refatoração de código sem mudança de comportamento |
+| `test` | Adição ou correção de testes |
+| `chore` | Tarefas de manutenção (build, dependências, configuração) |
+| `perf` | Melhoria de performance |
+
+#### Escopo (opcional)
+
+O escopo deve indicar a área afetada, ex: `mining`, `mechanic`, `adapter`, `domain`, `docs`, `test`, `build`.
+
+#### Regras de formatação
+
+1. **Primeira linha (título):** máximo de **50 caracteres**.
+2. **Corpo:** máximo de **72 caracteres** por linha. Use para explicar **o que** mudou e **por quê**, não apenas **como**.
+3. **Separe título e corpo** com uma linha em branco.
+4. **Use o imperativo presente** no título: "Add", "Fix", "Refactor" — não "Added" ou "Adds".
+5. **Seja específico e descritivo.** Evite mensagens vagas como "update", "fix bug" ou "stuff".
+6. **Um commit = uma mudança lógica.** Commits devem ser coesos e focados em uma única tarefa.
+
+#### Corpo do commit
+
+O corpo deve explicar:
+- **O contexto** da mudança.
+- **O motivo** da mudança (por que ela é necessária).
+- **Qualquer impacto** ou trade-off relevante.
+- **Referências a ADRs, issues ou tarefas**, quando aplicável.
+
+#### Rodapé (opcional)
+
+Use o rodapé para:
+- **Referenciar issues** com `Closes #123` ou `Fixes #456`.
+- **Marcar breaking changes** com `BREAKING CHANGE:` seguido da descrição.
+
+#### Exemplos
+
+**Commit simples (sem corpo):**
+```
+feat(mining): adiciona suporte a tiers de ferramentas
+```
+
+**Commit com corpo e referência:**
+```
+fix(adapter): corrige vazamento de Bukkit em VeinMinerEventTriggerService
+
+Remove import morto de org.bukkit.inventory.ItemStack que estava
+vazando a dependência para a camada application.
+
+Closes #42
+```
+
+**Commit com breaking change:**
+```
+refactor(api): altera assinatura de Mechanic.execute()
+
+Agora recebe MechanicContext em vez de parâmetros avulsos.
+
+BREAKING CHANGE: Qualquer mecânica personalizada deve ser
+atualizada para usar a nova assinatura.
+```
+
+---
 
 ### Pull Requests
 
-- **Título:** Segue formato de commit.
-- **Descrição obrigatória:**
+#### Título
 
-  ## O que foi feito?
-  - [Lista de mudanças]
-  
-  ## Como testar?
-  - [Passos para validar manualmente ou via integração]
-  
-  ## Breaking Changes?
-  - [Sim/Não - se sim, descrever]
-  
-  ## ADR relacionado?
-  - [Número do ADR, se houver]
-  
-  ## Checklist
-  - [ ] GitHub Actions passou (build, test, integrationTest)
-  - [ ] Arquitetura fitness (ArchUnit) passou
-  - [ ] Documentação atualizada (se necessário)
-  - [ ] Testes de integração Paper adicionados/atualizados (conforme ADR-0013)
+O título do PR deve seguir o mesmo formato de commit:
 
-- **Tamanho:** Preferir PRs com menos de 400 linhas alteradas. Mudanças maiores devem ser divididas em múltiplos PRs.
-- **Revisão:** Pelo menos 1 aprovação de mantenedor.
+```
+<tipo>(<escopo>): <descrição curta>
+```
+
+#### Descrição obrigatória
+
+Todo PR deve incluir a seguinte estrutura:
+
+```markdown
+## O que foi feito?
+- [Lista de mudanças]
+
+## Como testar?
+- [Passos para validar manualmente ou via integração]
+
+## Breaking Changes?
+- [Sim/Não - se sim, descrever]
+
+## ADR relacionado?
+- [Número do ADR, se houver]
+
+## Checklist
+- [ ] GitHub Actions passou (build, test, integrationTest)
+- [ ] Arquitetura fitness (ArchUnit) passou
+- [ ] Documentação atualizada (se necessário)
+- [ ] Testes de integração Paper adicionados/atualizados (conforme ADR-0013)
+- [ ] `AI_CHANGELOG.md` atualizado com a run correspondente (se aplicável)
+```
+
+#### Tamanho do PR
+
+- Prefira PRs com **menos de 400 linhas alteradas**.
+- Mudanças maiores devem ser divididas em múltiplos PRs.
+- Isso facilita a revisão e reduz o risco de conflitos.
+
+#### Revisão
+
+- Pelo menos **1 aprovação de mantenedor** é necessária antes do merge.
+- PRs com testes de integração falhando **não podem ser mesclados**.
+
+---
+
+#### Boas práticas adicionais
+
+1. **Commits atômicos:** Cada commit deve representar uma mudança lógica e completa. Evite commits que misturam correções com novas funcionalidades.
+2. **Mensagens descritivas:** Se o corpo for necessário, use-o. Não dependa apenas do título.
+3. **Revise antes de commitar:** Leia sua mensagem em voz alta — ela faz sentido para quem não estava no contexto?
+4. **Use `--amend` com cuidado:** Apenas para ajustes locais antes do push. Não force push em branches compartilhados sem acordo.
+5. **Referencie ADRs e issues:** Isso conecta o código às decisões arquiteturais e ao planejamento.
 
 ---
 
@@ -272,14 +367,14 @@ Conforme formalizado no **ADR-0013 (Test Integration Strategy)**, os testes de i
 ## ❓ 9. INCERTEZAS E LACUNAS COGNITIVAS
 
 - **Desconhecimento do agente:**
-  - Comportamento exato do Paper/Folia em regiões de fronteira (requer spikes).
-  - Detalhes de implementação de plugins de proteção (WorldGuard, etc.).
-  - Regras de negócio específicas do servidor (não fazem parte do escopo do plugin).
+- Comportamento exato do Paper/Folia em regiões de fronteira (requer spikes).
+- Detalhes de implementação de plugins de proteção (WorldGuard, etc.).
+- Regras de negócio específicas do servidor (não fazem parte do escopo do plugin).
 - **Limitações do modelo (kilo-auto/free):**
-  - O modelo pode mudar a cada requisição.
-  - Em caso de "Rate Limit", suspender tarefa e notificar.
-  - Não processar dados sensíveis (tokens, senhas).
-  - Ser conciso para economizar tokens.
+- O modelo pode mudar a cada requisição.
+- Em caso de "Rate Limit", suspender tarefa e notificar.
+- Não processar dados sensíveis (tokens, senhas).
+- Ser conciso para economizar tokens.
 
 ---
 
@@ -298,12 +393,80 @@ Conforme formalizado no **ADR-0013 (Test Integration Strategy)**, os testes de i
 
 ## 🔄 11. CONSERVAÇÃO DA COMPLEXIDADE
 
-Ao final de cada tarefa, reportar:
+Ao final de cada tarefa, o agente **deve** gerar um relatório estruturado que documente:
+- O que mudou no código.
+- Onde a complexidade foi realocada.
+- Quais arquivos foram criados, modificados ou removidos.
+- Um resumo prático das alterações em cada arquivo.
 
-### 🔍 Relatório de Complexidade:
-- **Simplificado:** [O que ficou mais simples? Ex: separação de responsabilidades]
-- **Complexidade realocada para:** [Onde a dificuldade foi parar? Ex: no adaptador, na aplicação]
-- **Novo gargalo potencial:** [O que pode se tornar o próximo limite? Ex: concorrência, I/O]
+Isso garante rastreabilidade, facilita code reviews e mantém o histórico de decisões técnicas.
+
+---
+
+### 📋 Relatório de Finalização de Tarefa
+
+O relatório deve seguir este formato:
+
+## 🔍 Relatório de Complexidade
+
+### 📁 Arquivos Modificados
+
+| Arquivo | Tipo de Alteração | Resumo das Mudanças |
+| :--- | :--- | :--- |
+| `src/main/java/.../X.java` | Modificado | Adicionado método `foo()`; refatorada lógica de validação para usar `BarService`. |
+| `src/test/java/.../XTest.java` | Modificado | Adicionados testes para o novo método `foo()` cobrindo casos de sucesso e erro. |
+| `src/main/java/.../Y.java` | Criado | Nova classe para encapsular a lógica de transformação; implementa `TransformPort`. |
+| `src/main/resources/definitions.yml` | Modificado | Adicionado bloco `example_block` com `numeric_id: 42` para teste. |
+
+### 📊 Resumo da Complexidade
+
+- **Simplificado:** [O que ficou mais simples? Ex: separação de responsabilidades, eliminação de duplicação]
+- **Complexidade realocada para:** [Onde a dificuldade foi parar? Ex: no adaptador, na aplicação, no novo serviço]
+- **Novo gargalo potencial:** [O que pode se tornar o próximo limite? Ex: concorrência, I/O, crescimento do índice PDC]
+
+### 📝 Registro no AI Changelog
+
+**Obrigatoriamente**, antes de finalizar a tarefa, o agente deve atualizar o arquivo [`AI_CHANGELOG.md`](../../AI_CHANGELOG.md) na raiz do repositório, criando uma nova entrada com o **próximo número sequencial** (ex: `[0003] - YYYY-MM-DD`) e descrevendo as mudanças realizadas nesta run.
+
+A entrada deve seguir o formato:
+
+## [0003] - 2026-07-15
+
+### 🔧 Run 3 – [Título resumido da tarefa]
+
+#### Added
+- **Descrição do que foi adicionado** – detalhes, arquivos afetados, motivo.
+
+#### Changed
+- **Descrição do que foi alterado** – detalhes, arquivos afetados, impacto.
+
+#### Fixed
+- **Descrição do que foi corrigido** – bug, arquivo, solução.
+
+#### Removed
+- **Descrição do que foi removido** – arquivo, funcionalidade, motivo.
+
+#### Deprecated
+- **Descrição do que foi depreciado** – funcionalidade, alternativa sugerida.
+
+> **Nota:** Se a tarefa não envolveu alterações de código (ex: apenas análise ou planejamento), ainda assim deve ser registrada, com os campos preenchidos como `(Nenhuma alteração de código)` ou similar.
+
+### ✅ Checklist de Validação Pós‑Tarefa
+
+- [ ] `./gradlew test --no-daemon` passou localmente (se houver alterações de código).
+- [ ] `./gradlew integrationTest --no-daemon` passou (se aplicável).
+- [ ] `tessera index .` foi executado e a validação de símbolos está OK (se houver novos arquivos/símbolos).
+- [ ] Arquitetura fitness (ArchUnit) não foi violada.
+- [ ] Documentação atualizada (se necessário).
+- [ ] Commits seguem o padrão `tipo(escopo): mensagem`.
+- [ ] **`AI_CHANGELOG.md` foi atualizado** com a nova entrada da run.
+
+**Instruções para o agente:**
+- Preencha a tabela com **todos** os arquivos que sofreram alterações (criação, modificação, exclusão).
+- No resumo, seja **conciso**, mas específico o bastante para que um revisor entenda o impacto da mudança sem precisar abrir cada arquivo.
+- **Nunca finalize uma tarefa sem atualizar o `AI_CHANGELOG.md`** – isso é tão importante quanto os testes.
+- Se a tarefa envolveu múltiplos commits, o relatório pode ser consolidado por arquivo, não por commit.
+- Se nenhum arquivo foi alterado (ex: tarefa de análise), justifique no relatório e registre no changelog como `(Nenhuma alteração de código)`.
 
 ---
 
@@ -321,11 +484,11 @@ Ao final de cada tarefa, reportar:
 1. Identificar a causa raiz.
 2. Registrar em `LEARNINGS.md` (ou diretamente no relatório).
 3. Aplicar o **Filtro de Escopo Adaptativo**:
-   - O erro já ocorreu **pelo menos 2 vezes**?
-   - Está **dentro do escopo atual** (custom blocks/tools/items)?
-   - É **generalizável** para várias tarefas?
-   - ✅ Se atender aos 3, propor atualização do `AGENTS.md`.
-   - ❌ Caso contrário, manter apenas no `LEARNINGS.md`.
+ - O erro já ocorreu **pelo menos 2 vezes**?
+ - Está **dentro do escopo atual** (custom blocks/tools/items)?
+ - É **generalizável** para várias tarefas?
+ - ✅ Se atender aos 3, propor atualização do `AGENTS.md`.
+ - ❌ Caso contrário, manter apenas no `LEARNINGS.md`.
 
 ---
 
@@ -333,9 +496,9 @@ Ao final de cada tarefa, reportar:
 
 - **Ambiente atual:** Desenvolvimento local (simulado) + GitHub Actions para validação.
 - **Se o ambiente for `kilo-auto/free` (gratuito):**
-  - Seja conciso para economizar tokens.
-  - Prefira blocos de código completos em vez de múltiplas confirmações (o modelo pode mudar).
-  - Documente a data e o modelo usado para rastrear variações.
+- Seja conciso para economizar tokens.
+- Prefira blocos de código completos em vez de múltiplas confirmações (o modelo pode mudar).
+- Documente a data e o modelo usado para rastrear variações.
 
 ---
 
@@ -351,31 +514,31 @@ Ao final de cada tarefa, reportar:
 Ao receber qualquer tarefa, siga **estes 5 passos obrigatórios**:
 
 1. **Verificação de Escopo:**  
-   - "✅ Dentro do escopo" ou "🚫 Fora do escopo" com referência ao documento relevante (ex: PROJECT_SCOPE.md, ADR).  
-   - Se fora, justifique e pare.
+ - "✅ Dentro do escopo" ou "🚫 Fora do escopo" com referência ao documento relevante (ex: PROJECT_SCOPE.md, ADR).  
+ - Se fora, justifique e pare.
 
 2. **Plano de Ação (usando Tessera obrigatoriamente):**  
-   - Use `validate` e `find_definition` para mapear os símbolos envolvidos.
-   - Use `impact` para listar chamadores (se for refatoração).
-   - Use `context_pack` no símbolo principal para obter corpo, dependências e chamadores em uma chamada.
-   - **Só depois** de esgotar as ferramentas do Tessera, liste os arquivos que serão modificados ou criados (caminhos completos).
-   - Mencione quais ADRs/guardrails são afetados.
+ - Use `validate` e `find-definition` para mapear os símbolos envolvidos.
+ - Use `impact` para listar chamadores (se for refatoração).
+ - Use `context-pack` no símbolo principal para obter corpo, dependências e chamadores em uma chamada.
+ - **Só depois** de esgotar as ferramentas do Tessera, liste os arquivos que serão modificados ou criados (caminhos completos).
+ - Mencione quais ADRs/guardrails são afetados.
 
 3. **Execução (com validação contínua):**  
-   - Gere o código, análise ou documentação, respeitando a arquitetura.
-   - Ao gerar código que referencia símbolos existentes, use `validate` antes de cada referência.
-   - **Nunca** use `grep` ou `read` para encontrar definições — use `find_definition`.
-   - **Nunca** leia um arquivo inteiro para obter contexto — use `context_pack`.
-   - Se precisar de uma visão geral de um pacote, use `search` com padrão (ex: `search '*Service'`) em vez de `get_outline` no diretório.
+ - Gere o código, análise ou documentação, respeitando a arquitetura.
+ - Ao gerar código que referencia símbolos existentes, use `validate` antes de cada referência.
+ - **Nunca** use `grep` ou `read` para encontrar definições — use `find-definition`.
+ - **Nunca** leia um arquivo inteiro para obter contexto — use `context-pack`.
+ - Se precisar de uma visão geral de um pacote, use `search` com padrão (ex: `search '*Service'`) em vez de `get-outline` no diretório.
 
 4. **Relatório de Trade-off:**  
-   - Indique o que foi sacrificado (ex: simplicidade, performance) e por quê.
-   - Mencione o custo em tokens economizado pelo uso do Tessera (opcional).
+ - Indique o que foi sacrificado (ex: simplicidade, performance) e por quê.
+ - Mencione o custo em tokens economizado pelo uso do Tessera (opcional).
 
 5. **Relatório de Complexidade e Reindexação:**  
-   - Conforme o item 11.
-   - Se novos arquivos foram criados ou símbolos renomeados, **sugira** `tessera index .` para atualizar o grafo (ou execute, se tiver permissão).
-   - Indique se a reindexação foi realizada e se os novos símbolos foram validados.
+ - Conforme o item 11.
+ - Se novos arquivos foram criados ou símbolos renomeados, **sugira** `tessera index .` para atualizar o grafo (ou execute, se tiver permissão).
+ - Indique se a reindexação foi realizada e se os novos símbolos foram validados.
 
 ---
 
@@ -389,6 +552,7 @@ Ao receber qualquer tarefa, siga **estes 5 passos obrigatórios**:
 - `2026-06-25 (v2.1.1)`: Integração oficial do Tessera para navegação determinística de código (item 3.5).
 - `2026-06-25 (v2.1.2)`: Adição do MCFAST-MCP como MCP secundário para edição AST-aware de arquivos, complementando o Tessera.
 - `2026-07-11 (v2.1.3)`: **Incorporação do ADR-0013 (Test Integration Strategy).** Adicionada a obrigatoriedade de testes de integração Paper para novas mecânicas oficiais, criação da `BasePaperIntegrationTest` e do `TestCustomContentPlugin` para injeção de dependências em testes. Atualização das seções 4 (Testes) e 6 (PR Checklist).
+- `2026-07-15 (v2.1.4)`: **Aprimoramento das seções 3.5 e 11.** Adicionadas diretrizes detalhadas para tratamento de erros do Tessera, fallback e compatibilidade com Windows/PowerShell; expansão da seção 11 com relatório prático de arquivos alterados, checklist de validação e obrigatoriedade de registro no `AI_CHANGELOG.md`.
 
 ---
 
@@ -412,7 +576,8 @@ Ao receber qualquer tarefa, siga **estes 5 passos obrigatórios**:
 - `docs/MCFAST_GUIDE.md` (opcional) — Guia detalhado de uso do MCFAST-MCP (caso criado).
 - **`docs/adr/0013-test-integration-strategy.md`** — Estratégia formal de testes de integração (obrigatória para novas mecânicas).
 - **`docs/TEST_INTEGRATION_PLAN.md`** — Plano de implementação detalhado (fases 0 a 4) para os testes de integração.
+- **`AI_CHANGELOG.md`** — Registro histórico de alterações realizadas por agentes (raiz do repositório).
 
 ---
 
-**Fim do AGENTS.md — v2.1.3 (CustomContent Engine com ADR-0013 integrado e obrigatoriedade de testes de integração Paper)**
+**Fim do AGENTS.md — v2.1.4 (CustomContent Engine com diretrizes aprimoradas para Tessera, relatório de complexidade detalhado e registro obrigatório no AI Changelog)**
