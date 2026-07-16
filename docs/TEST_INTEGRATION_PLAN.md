@@ -356,6 +356,8 @@ and this document adheres to [Semantic Versioning](https://semver.org/spec/v2.0.
 #### Fixed
 - Resolved discrepancy where `AI_CHANGELOG.md` Run 1 documented a fix for `BlockTransformMechanic` that was not present in the source code.
 - Increased `awaitBlockState` timeouts in `MechanicTriggerIntegrationTest` and `MiningE2EIntegrationTest` to 30s/60s to accommodate slower Paper server startup in local Windows environments.
+- Fixed `BasePaperIntegrationTest.awaitBlockState` to actively poll via `/debugquery` and check only new output lines, eliminating stale-output false positives that caused timeouts in GitHub Actions.
+- Fixed `BasePaperIntegrationTest.placeBlock` to no longer wait for `AIR` after placing a block.
 
 ### [1.1.0] - 2026-07-11
 

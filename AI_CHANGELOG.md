@@ -11,7 +11,9 @@
 - **`build.gradle.kts`** — atualizado para incluir plugin Jacoco, dependências e tasks de relatório combinado.
 
 #### Fixed
-- Resolvida a discrepância documentada em `AI_CHANGELOG.md` Run 1 onde o fix de `BlockTransformMechanic` foi registrado mas não aplicado ao código.
+- Corrigido `BasePaperIntegrationTest.awaitBlockState` para fazer polling ativo via `/debugquery` e verificar apenas linhas novas, eliminando falsos positivos por output obsoleto que causavam timeouts no GitHub Actions.
+- Corrigido `BasePaperIntegrationTest.placeBlock` que aguardava estado `AIR` após colocar bloco, causando falha imediata.
+- Corrigido stale-output issue em `awaitBlockState` adicionando `outputLineCount()` e `outputLine(int)` em `PaperServer` para rastrear apenas output novo.
 
 #### Removed
 - Nenhuma remoção.
@@ -29,7 +31,7 @@
 - [ ] Commits seguem o padrão `tipo(escopo): mensagem`.
 - [x] `AI_CHANGELOG.md` foi atualizado com a nova entrada da run.
 
-> **Nota:** Testes de unidade `CustomMiningCompletionServiceTest.worldMutationFailureReturnsFailedAndStopsPipeline` e `BlockTransformMechanicTest` compilaram e executaram com sucesso (291 testes unitários verdes). Testes de integração Paper (`integrationTestSmoke`) não foram concluídos localmente devido a lentidão extrema do ambiente Windows (startup do servidor Paper excedendo 120s, causando timeouts nos testes mesmo com janelas de 10 minutos). O código-fonte e os testes de unidade estão consistentes com as alterações.
+> **Nota:** Testes de unidade `CustomMiningCompletionServiceTest.worldMutationFailureReturnsFailedAndStopsPipeline` e `BlockTransformMechanicTest` compilaram e executaram com sucesso (291 testes unitários verdes). Correção aplicada em `BasePaperIntegrationTest`: `awaitBlockState` agora envia `/debugquery` e faz polling ativo do estado do bloco, resolvendo timeouts nos testes de integração Paper no GitHub Actions. Testes de integração locais continuam inviáveis por lentidão do startup do Paper no ambiente Windows; validação final depende de CI.
 
 ---
 

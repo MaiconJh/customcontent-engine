@@ -111,6 +111,17 @@ public final class PaperServer implements AutoCloseable {
         return outputLines.stream().anyMatch(line -> line.contains(text));
     }
 
+    public int outputLineCount() {
+        return outputLines.size();
+    }
+
+    public String outputLine(int index) {
+        if (index < 0 || index >= outputLines.size()) {
+            return null;
+        }
+        return outputLines.get(index);
+    }
+
     public void clearOutput() {
         outputLines.clear();
     }

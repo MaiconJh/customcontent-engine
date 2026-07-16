@@ -72,15 +72,29 @@ public abstract class BasePaperIntegrationTest {
 
     protected static void placeBlock(String blockId, WorldPosition position) throws Exception {
         sendCommand("debugplace " + blockId + " " + position.x() + " " + position.y() + " " + position.z() + " " + position.worldName());
-        awaitBlockState(position, "none", "AIR", COMMAND_TIMEOUT);
     }
 
     protected static void mineBlock(String toolId, WorldPosition position) throws Exception {
         sendCommand("debugmine " + toolId + " " + position.x() + " " + position.y() + " " + position.z() + " " + position.worldName());
     }
 
-    protected static void awaitBlockState(WorldPosition position, String expectedNumericId, String expectedMaterial, Duration timeout) throws InterruptedException {
-        awaitOutput(line -> line.contains("x=" + position.x() + " y=" + position.y() + " z=" + position.z() + " numericId=" + expectedNumericId + " material=" + expectedMaterial), timeout);
+    protected static void awaitBlockState(WorldPosition position, String expectedNumericId, String expectedMaterial, Duration timeout) throws InterruptedException, java.io.IOException {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        int lastIndex = server.outputLineCount();
+        while (System.nanoTime() < deadline) {
+            sendCommand("debugquery " + position.x() + " " + position.y() + " " + position.z() + " " + position.worldName());
+            Thread.sleep(100);
+            int currentIndex = server.outputLineCount();
+            for (int index = lastIndex; index < currentIndex; index++) {
+                String line = server.outputLine(index);
+                if (line.contains("x=" + position.x() + " y=" + position.y() + " z=" + position.z() + " numericId=" + expectedNumericId + " material=" + expectedMaterial)) {
+                    return;
+                }
+            }
+            lastIndex = currentIndex;
+            Thread.sleep(100);
+        }
+        throw new AssertionError("Timed out waiting for block state.%n%s".formatted(fullOutput()));
     }
 
     /**
