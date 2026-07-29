@@ -40,6 +40,8 @@ class MiningE2EIntegrationTest extends BasePaperIntegrationTest {
         server.clearOutput();
         mineBlock("stone_pickaxe", TARGET);
         awaitBlockState(TARGET, "none", "AIR", Duration.ofSeconds(60));
-        assertFalse(outputContains("numericId=1"), () -> "Identity re-created on second mine%n" + fullOutput());
+        assertFalse(
+                outputContains("debugmine failed"),
+                () -> "Second mine should not report failure%n" + fullOutput());
     }
 }

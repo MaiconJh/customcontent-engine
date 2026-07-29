@@ -359,7 +359,7 @@ Todo PR deve incluir a seguinte estrutura:
 
 - **Viés de otimização:** Priorizar **legibilidade, testabilidade e pureza** sobre micro-otimizações. A menos que haja evidência de gargalo (ex: spike), manter código claro.
 - **Tolerância a riscos:** Baixa tolerância para dependências instáveis ou violações de arquitetura. Alta tolerância para código verboso se aumentar a clareza.
-- **Ferramentas preferidas:** Gradle, JUnit, Mockito, ArchUnit, Git, Tessera, MCFAST (edição AST-aware).
+- **Ferramentas preferidas:** Gradle, JUnit, Mockito, ArchUnit, Git e Tessera.
 - **Foco:** Manter o core estável e conservador, incubando novas ideias como experimentais ou oficiais antes de promover ao core.
 
 ---
@@ -550,7 +550,6 @@ Ao receber qualquer tarefa, siga **estes 5 passos obrigatórios**:
 - `2026-06-20 (v2.0)`: Adaptação completa para CustomContent Engine, alinhado com PROJECT_SCOPE.md, ARCHITECTURE_GUARDRAILS.md, ADRs e milestones.
 - `2026-06-25 (v2.1)`: Integração oficial do Tessera para navegação determinística de código (item 3.5).
 - `2026-06-25 (v2.1.1)`: Integração oficial do Tessera para navegação determinística de código (item 3.5).
-- `2026-06-25 (v2.1.2)`: Adição do MCFAST-MCP como MCP secundário para edição AST-aware de arquivos, complementando o Tessera.
 - `2026-07-11 (v2.1.3)`: **Incorporação do ADR-0013 (Test Integration Strategy).** Adicionada a obrigatoriedade de testes de integração Paper para novas mecânicas oficiais, criação da `BasePaperIntegrationTest` e do `TestCustomContentPlugin` para injeção de dependências em testes. Atualização das seções 4 (Testes) e 6 (PR Checklist).
 - `2026-07-15 (v2.1.4)`: **Aprimoramento das seções 3.5 e 11.** Adicionadas diretrizes detalhadas para tratamento de erros do Tessera, fallback e compatibilidade com Windows/PowerShell; expansão da seção 11 com relatório prático de arquivos alterados, checklist de validação e obrigatoriedade de registro no `AI_CHANGELOG.md`.
 
@@ -573,7 +572,6 @@ Ao receber qualquer tarefa, siga **estes 5 passos obrigatórios**:
 - `docs/adr/*.md` — Decisões arquiteturais aceitas.
 - `docs/milestones/*.md` — Marcos completos e planejados.
 - `docs/AI_CONTEXT_PACK.md` — Resumo derivado (não substitui os documentos fonte).
-- `docs/MCFAST_GUIDE.md` (opcional) — Guia detalhado de uso do MCFAST-MCP (caso criado).
 - **`docs/adr/0013-test-integration-strategy.md`** — Estratégia formal de testes de integração (obrigatória para novas mecânicas).
 - **`docs/TEST_INTEGRATION_PLAN.md`** — Plano de implementação detalhado (fases 0 a 4) para os testes de integração.
 - **`AI_CHANGELOG.md`** — Registro histórico de alterações realizadas por agentes (raiz do repositório).

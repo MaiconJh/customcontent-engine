@@ -499,14 +499,15 @@ Examples:
 Specialized capabilities must start outside the stable core.
 
 Examples:
-- particle emitter;
-- sound emitter;
-- transform rule;
-- vein graph query;
-- resource export;
-- advanced visual effect capability;
-- `EnchantmentView` (module capability, ADR-0011);
-- `MechanicArguments` (module capability, ADR-0011).
+- `EnchantmentView` — reads enchantment levels (ADR-0011).
+- `MechanicArguments` — reads per-binding YAML arguments (ADR-0011).
+- `ActorState` — reads player state such as sneaking (ADR-0011).
+- `MECHANIC_CONFIG` — formal configuration capability for mechanics (ADR-0008).
+- `ParticleEmitter`, `SoundEmitter`, `TransformRule`, and other specialised
+  module-owned capabilities.
+
+These capabilities may be official, but they are not part of the stable core.
+Their ownership and optionality remain governed by ADR-0003 and ADR-0005.
 
 Rules:
 

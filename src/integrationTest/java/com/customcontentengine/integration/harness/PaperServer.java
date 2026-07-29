@@ -73,13 +73,16 @@ public final class PaperServer implements AutoCloseable {
     }
 
     public static PaperServer start(Path serverDirectory, Path paperJar, java.util.Map<String, String> systemProperties) throws IOException {
-        ProcessBuilder builder = new ProcessBuilder(
-                javaExecutable(),
-                "-Xms512M",
-                "-Xmx1G",
-                "-jar",
-                paperJar.toAbsolutePath().toString(),
-                "--nogui");
+        java.util.List<String> commands = new java.util.ArrayList<>();
+        commands.add(javaExecutable());
+        commands.add("-Xms512M");
+        commands.add("-Xmx1G");
+        commands.add("-XX:+TieredCompilation");
+        commands.add("-XX:TieredStopAtLevel=1");
+        commands.add("-jar");
+        commands.add(paperJar.toAbsolutePath().toString());
+        commands.add("--nogui");
+        ProcessBuilder builder = new ProcessBuilder(commands);
         builder.directory(serverDirectory.toFile());
         builder.redirectErrorStream(true);
         java.util.Map<String, String> environment = builder.environment();
@@ -89,14 +92,21 @@ public final class PaperServer implements AutoCloseable {
 
     public void awaitOutput(Predicate<String> predicate, Duration timeout) throws InterruptedException {
         long deadline = System.nanoTime() + timeout.toNanos();
+        int lastIndex = 0;
+        long waitMillis = 100;
         while (System.nanoTime() < deadline) {
-            if (outputLines.stream().anyMatch(predicate)) {
-                return;
+            int currentIndex = outputLines.size();
+            for (int index = lastIndex; index < currentIndex; index++) {
+                if (predicate.test(outputLines.get(index))) {
+                    return;
+                }
             }
+            lastIndex = currentIndex;
             if (!process.isAlive()) {
                 throw new AssertionError("Paper server exited before expected output.%n%s".formatted(fullOutput()));
             }
-            Thread.sleep(100);
+            Thread.sleep(waitMillis);
+            if (waitMillis < 500) waitMillis += 50;
         }
         throw new AssertionError("Timed out waiting for Paper server output.%n%s".formatted(fullOutput()));
     }
@@ -147,9 +157,9 @@ public final class PaperServer implements AutoCloseable {
     public void close() throws Exception {
         if (process.isAlive()) {
             sendCommand("stop");
-            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                process.waitFor(10, TimeUnit.SECONDS);
+                process.waitFor(15, TimeUnit.SECONDS);
             }
         }
     }

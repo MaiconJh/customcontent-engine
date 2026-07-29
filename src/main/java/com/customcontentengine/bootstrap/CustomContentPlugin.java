@@ -6,6 +6,9 @@ import com.customcontentengine.adapter.bukkit.BlockPlaceAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitDropAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitWorldMutationAdapter;
 import com.customcontentengine.adapter.bukkit.DebugRegistryCommandAdapter;
+import com.customcontentengine.adapter.bukkit.DebugMineCommandAdapter;
+import com.customcontentengine.adapter.bukkit.DebugPlaceCommandAdapter;
+import com.customcontentengine.adapter.bukkit.DebugQueryCommandAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitItemMetadataAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitMiningVisualAdapter;
 import com.customcontentengine.adapter.bukkit.BukkitToolWearAdapter;
@@ -50,7 +53,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class CustomContentPlugin extends JavaPlugin {
     private static final int MINING_MAX_SESSIONS_PER_RUN = 64;
-    private static final long MINING_PROCESSING_PERIOD_TICKS = 2L;
+    // Reduzido o período para 1 tick para acelerar o processamento da mineração
+    private static final long MINING_PROCESSING_PERIOD_TICKS = 1L;
 
     private MiningProcessingDriver miningProcessingDriver;
 
@@ -184,6 +188,21 @@ public class CustomContentPlugin extends JavaPlugin {
         PluginCommand debugRegistryCommand = getCommand("debugregistry");
         if (debugRegistryCommand != null) {
             debugRegistryCommand.setExecutor(new DebugRegistryCommandAdapter(registry));
+        }
+
+        PluginCommand debugPlaceCommand = getCommand("debugplace");
+        if (debugPlaceCommand != null) {
+            debugPlaceCommand.setExecutor(new DebugPlaceCommandAdapter(registry, blockStore, worldMutation, getConfig()));
+        }
+
+        PluginCommand debugMineCommand = getCommand("debugmine");
+        if (debugMineCommand != null) {
+            debugMineCommand.setExecutor(new DebugMineCommandAdapter(registry, blockStore, miningSessionService, getConfig()));
+        }
+
+        PluginCommand debugQueryCommand = getCommand("debugquery");
+        if (debugQueryCommand != null) {
+            debugQueryCommand.setExecutor(new DebugQueryCommandAdapter(blockStore, getConfig()));
         }
     }
 

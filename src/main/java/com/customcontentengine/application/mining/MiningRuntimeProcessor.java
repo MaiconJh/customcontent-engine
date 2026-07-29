@@ -7,8 +7,11 @@ import com.customcontentengine.port.MiningVisualPort;
 import com.customcontentengine.port.SchedulerPort;
 import java.util.List;
 import java.util.Objects;
+import java.util.logging.Logger;
 
 public final class MiningRuntimeProcessor {
+    private static final Logger LOGGER = Logger.getLogger(MiningRuntimeProcessor.class.getName());
+
     private final MiningSessionService sessionService;
     private final MiningVisualPort visualPort;
     private final MiningCompletionPort completionPort;
@@ -31,6 +34,10 @@ public final class MiningRuntimeProcessor {
         }
 
         List<MiningSession> activeSessions = sessionService.activeSessions();
+        if (activeSessions.isEmpty()) {
+            return 0;
+        }
+        LOGGER.fine(() -> "Processing " + activeSessions.size() + " active sessions");
         int scheduled = 0;
         for (MiningSession session : activeSessions) {
             if (scheduled >= maxSessions) {
@@ -48,10 +55,12 @@ public final class MiningRuntimeProcessor {
 
         var active = sessionService.getActiveSession(actorKey);
         if (active.isEmpty() || !active.get().target().equals(target)) {
+            LOGGER.fine(() -> "No active session for " + actorKey + " at " + target);
             return MiningRuntimeUpdate.noSession();
         }
         MiningRuntimeUpdate update = sessionService.processSessionForRuntime(actorKey, nowMillis);
         if (update.completed()) {
+            LOGGER.info(() -> "Completing mining session for " + actorKey + " at " + target);
             completionPort.complete(new MiningCompletionPort.CompletionRequest(
                     actorKey,
                     target,

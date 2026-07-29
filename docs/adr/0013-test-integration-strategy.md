@@ -1,7 +1,9 @@
+---
+
 # ADR 0013 — Test Integration Strategy
 
 **Status:** Accepted  
-**Date:** 2026-07-11  
+**Date:** 2026-07-16 (updated)  
 **Project:** CustomContent Engine  
 **Supersedes:** N/A
 
@@ -60,6 +62,27 @@ The integration tests will run in GitHub Actions as part of the `./gradlew integ
 - Integration test failures will block the PR from being merged.
 - The full suite will run on every push to `main` and on pull requests targeting `main`.
 
+### 6. Performance Optimization Strategy (Added 2026-07-16)
+
+With all phases implemented, the full integration suite execution time reached approximately 15 minutes. To reduce this without compromising fidelity, the following optimizations are approved:
+
+**6.1. Server Reuse Across Test Classes**
+- The Paper server will be started once per integration test suite execution (lazy `@BeforeAll` initialization and a JVM shutdown hook).
+- State is cleaned between tests via commands or by using distinct coordinates per test.
+- This eliminates the ~60‑90s startup overhead for each test class.
+
+**6.2. JVM Flags for Fast Startup**
+- The Paper process will be launched with `-XX:TieredStopAtLevel=1` and `-XX:+TieredCompilation`.
+- This prioritizes C1 compilation (fast startup) over C2 (peak performance), which is safe for functional tests.
+
+**6.3. Controlled Parallelization with `maxParallelForks`**
+- Gradle's `integrationTest` task will use `maxParallelForks` set to `min(2, availableProcessors / 2)` in CI.
+- Each fork uses isolated temporary directories and free ports, avoiding resource conflicts.
+
+**6.4. Test Profiles: Smoke vs. Complete**
+- **`integrationTestSmoke`**: Runs only critical tests (Phases 0–1, tagged with `@Tag("smoke")` or `@Tag("mining")`). Executed on every PR.
+- **`integrationTest`**: Runs the full suite (Phases 0–4). Executed on merges to `main` or manually.
+
 ---
 
 ## Consequences
@@ -70,12 +93,13 @@ The integration tests will run in GitHub Actions as part of the `./gradlew integ
 - **Folia Readiness**: The test harness provides a foundation for running Folia-specific tests in the future.
 - **Confidence in Official Mechanics**: New mechanics will have proven behavior in a real server environment.
 - **Regression Safety**: Critical flows are automatically verified, reducing manual QA overhead.
+- **Faster CI Feedback**: PRs now run ~3‑5 minutes instead of ~15 minutes, significantly improving developer productivity.
 
 ### Negative
 
-- **Longer CI Times**: Integration tests add 5–10 minutes to the CI pipeline.
-- **Increased Maintenance**: The test infrastructure (base classes, test plugin) must be maintained alongside production code.
-- **Resource Consumption**: Running Paper servers for tests requires more GitHub Actions runner resources (memory and CPU).
+- **Longer CI Times** (mitigated): Full suite still adds time, but smoke tests are fast.
+- **Increased Maintenance**: The test infrastructure and state cleanup logic must be maintained alongside production code.
+- **Resource Consumption**: Parallelization may increase memory/CPU usage on CI runners (monitoring recommended).
 
 ---
 
@@ -88,12 +112,14 @@ The integration tests will run in GitHub Actions as part of the `./gradlew integ
 - Implementation of Phases 0 through 4 as outlined in `docs/TEST_INTEGRATION_PLAN.md`.
 - Updates to `.github/workflows/build-test.yml` to handle integration test artifacts and timeouts.
 - Mandatory integration tests for all future official mechanics.
+- **Implementation of performance optimizations** (server reuse, JVM flags, parallelization, smoke profiles) as defined above.
 
 ### Out of Scope
 
 - JMH performance benchmarks (already handled by spikes).
 - Unit test coverage (already robust).
 - Folia-specific integration tests (deferred until the Folia adapter is formally implemented).
+- MockBukkit or any substitute that does not replicate real Paper behavior.
 
 ---
 
@@ -111,14 +137,18 @@ The integration tests will run in GitHub Actions as part of the `./gradlew integ
 
 **Rejected.** Without a standardized base, each test would duplicate server startup/cleanup logic, leading to flaky tests and higher maintenance costs.
 
+### Run All Tests Sequentially Without Optimization
+
+**Rejected.** 15-minute CI times degrade developer experience. The adopted optimizations maintain fidelity while improving speed.
+
 ---
 
 ## Related Documents
 
-- `docs/TEST_INTEGRATION_PLAN.md` — Detailed phased implementation plan.
-- `docs/AGENTS.md` — Updated to reference this ADR.
+- `docs/TEST_INTEGRATION_PLAN.md` — Detailed phased implementation plan and optimization strategy.
+- `docs/AGENTS.md` — Updated to reference this ADR and new execution profiles.
 - `src/integrationTest/java/com/customcontentengine/integration/PaperPluginSmokeIntegrationTest.java` — Existing smoke test.
 
 ---
 
-**End of ADR**
+**End of ADR-0013**

@@ -1,7 +1,7 @@
 # Definitive Scope, Focus, and Boundaries Document — Evolutionary Implementation Version
 
 Project: CustomContent Engine  
-Version: 3.2.0 — Evolutionary scope refinements (Tool Tiers official, BlockTransformMechanic)  
+Version: 3.3.0 — Evolutionary scope refinements (VeinMiner official)
 Platform: Paper 1.21+ with Folia compatibility validated through technical spikes  
 Status: Approved as implementation scope with conservative evolutionary governance. Formal MVP freezing remains conditional on execution and validation of required technical spikes.
 
@@ -158,7 +158,41 @@ items:
 
 The mechanic requires the `MECHANIC_CONFIG` capability to read arguments. It is pure, stateless, and does not access Bukkit/Paper or services.
 
-### 8.6 Flow Control
+### 8.6 VeinMinerMechanic (Official)
+
+`vein_miner` is an official builtin module governed by ADR-0011. It traverses a
+connected vein of compatible custom blocks using bounded breadth-first search,
+while preserving the mechanic pipeline's cooldown, budget, protection, drop,
+and durability boundaries.
+
+Configuration is supplied per mechanic binding through YAML arguments:
+
+```yaml
+items:
+  vein_pickaxe:
+    mechanics:
+      on_block_break:
+        - vein_miner
+          arguments:
+            max_blocks: 64
+            max_depth: 20
+            shape: FACE_ADJACENT
+            require_sneak: false
+            respect_fortune: true
+            respect_silk_touch: true
+            durability_per_block: true
+            cooldown_seconds: 0
+            allowed_blocks:
+              - vein_test_ore
+```
+
+Supported arguments are `max_blocks`, `max_depth`, `shape`, `require_sneak`,
+`respect_fortune`, `respect_silk_touch`, `durability_per_block`,
+`cooldown_seconds`, and `allowed_blocks`. The mechanic remains pure and
+stateless: its optional `ENCHANTMENT_VIEW`, `MECHANIC_ARGUMENTS`, and
+`ACTOR_STATE` capabilities are module capabilities rather than stable-core API.
+
+### 8.7 Flow Control
 
 - Cooldown per player and per mechanic using a flat key structure and automatic expiration.
 - Work budget by explicit regional key, `RegionBudgetKey`, reset every region tick.
@@ -340,7 +374,8 @@ Functional scope:
 
 ### Confirmed Outside the MVP
 
-- Fortune, Silk Touch, and enchantments.
+- Fortune, Silk Touch, and enchantments outside the bounded `vein_miner`
+  module authorization in ADR-0011.
 - Identity preservation in anvil, smithing, grindstone, or repair.
 - TileState.
 - Chunk LRU cache.
@@ -349,7 +384,7 @@ Functional scope:
 - ServiceLoader.
 - Stable public API for third parties.
 - Advanced Folia cross-region behavior.
-- `auto_smelt`, `vein_miner`, or any third mechanic.
+- `auto_smelt` or any mechanic beyond the approved official modules.
 - External database.
 - `SchedulerAccess` inside `MechanicContext`.
 - `runOnEntity` and `runAsync` in `SchedulerPort`.

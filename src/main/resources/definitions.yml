@@ -49,6 +49,30 @@ blocks:
       - item: sapphire
         amount: 1
 
+  vein_test_ore:
+    numeric_id: 6
+    material_base: NOTE_BLOCK
+    custom_model_data: 1006
+    required_tool: vein_pickaxe
+    mining:
+      hardness: 2.0
+      required_tier: 1
+    drops:
+      - item: ruby
+        amount: 1
+
+  transform_target:
+    numeric_id: 5
+    material_base: STONE
+    custom_model_data: 1005
+    required_tool: transform_tool
+    mining:
+      hardness: 2.0
+      required_tier: 1
+    drops:
+      - item: cobblestone
+        amount: 1
+
 items:
   cobblestone:
     material_base: COBBLED_DEEPSLATE
@@ -152,3 +176,40 @@ items:
       max: 600
       damage_on_custom_block_break: 1
       break_when_zero: true
+
+  vein_pickaxe:
+    material_base: DIAMOND_PICKAXE
+    custom_model_data: 2005
+    attributes:
+      damage: 4.0
+      speed: 1.1
+      durability: 300
+    mining:
+      speed: 6.0
+      tier: 1
+    durability:
+      max: 300
+      damage_on_custom_block_break: 1
+      break_when_zero: true
+    mechanics:
+      on_block_break:
+        - vein_miner
+
+  transform_tool:
+    material_base: DIAMOND_PICKAXE
+    custom_model_data: 2006
+    attributes:
+      damage: 4.0
+      speed: 1.1
+      durability: 300
+    mining:
+      speed: 6.0
+      tier: 1
+    durability:
+      max: 300
+      damage_on_custom_block_break: 1
+      break_when_zero: true
+    mechanics:
+      on_block_break:
+        - block_transform:
+            to_block: "1"

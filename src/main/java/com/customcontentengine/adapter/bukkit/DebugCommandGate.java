@@ -24,11 +24,11 @@ public final class DebugCommandGate {
         if (sender == null) {
             return false;
         }
-        if (sender.hasPermission("customcontent.debug")) {
-            return config.getBoolean("debug.enabled", false);
-        }
         if (sender instanceof org.bukkit.command.ConsoleCommandSender) {
             return true;
+        }
+        if (sender.hasPermission("customcontent.debug")) {
+            return config.getBoolean("debug.enabled", false);
         }
         return false;
     }

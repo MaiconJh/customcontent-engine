@@ -28,10 +28,10 @@ class ProtectionIntegrationTest extends BasePaperIntegrationTest {
     void veinMinerSkipsProtectedBlocks() throws Exception {
         List<WorldPosition> vein = linearVein(VEIN_START, 5);
         for (WorldPosition position : vein) {
-            placeBlock("ruby_ore", position);
+            placeBlock("vein_test_ore", position);
         }
         for (WorldPosition position : vein) {
-            awaitBlockState(position, "3", "NOTE_BLOCK", Duration.ofSeconds(10));
+            awaitBlockState(position, "6", "NOTE_BLOCK", Duration.ofSeconds(10));
         }
 
         mineBlock("vein_pickaxe", VEIN_START);
@@ -43,8 +43,8 @@ class ProtectionIntegrationTest extends BasePaperIntegrationTest {
 
         awaitBlockState(firstUnprotected, "none", "AIR", Duration.ofSeconds(30));
         awaitBlockState(secondUnprotected, "none", "AIR", Duration.ofSeconds(30));
-        awaitBlockState(firstProtected, "3", "NOTE_BLOCK", Duration.ofSeconds(10));
-        awaitBlockState(lastProtected, "3", "NOTE_BLOCK", Duration.ofSeconds(10));
+        awaitBlockState(firstProtected, "6", "NOTE_BLOCK", Duration.ofSeconds(10));
+        awaitBlockState(lastProtected, "6", "NOTE_BLOCK", Duration.ofSeconds(10));
         assertFalse(
                 server.outputContains("Error occurred while enabling"),
                 () -> "Unexpected error during protection integration%n" + fullOutput());

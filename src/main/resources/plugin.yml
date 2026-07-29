@@ -16,3 +16,12 @@ commands:
   debugregistry:
     description: Dev tool that dumps registered item to mechanic bindings.
     usage: /debugregistry
+  debugplace:
+    description: Dev tool that places a custom block at a world position.
+    usage: /debugplace <blockId> <x> <y> <z> [world]
+  debugmine:
+    description: Dev tool that starts a custom mining session for integration tests.
+    usage: /debugmine <toolId> <x> <y> <z> [world]
+  debugquery:
+    description: Dev tool that reports the custom-block identity and current material at a position.
+    usage: /debugquery <x> <y> <z> [world]

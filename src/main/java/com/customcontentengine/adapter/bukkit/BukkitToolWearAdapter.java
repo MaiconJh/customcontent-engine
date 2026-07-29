@@ -34,7 +34,13 @@ public final class BukkitToolWearAdapter implements ToolWearPort {
         }
 
         int maxDurability = definition.get().durability().get().max();
-        Player player = Bukkit.getPlayer(UUID.fromString(actorKey));
+        UUID actorUuid;
+        try {
+            actorUuid = UUID.fromString(actorKey);
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+        Player player = Bukkit.getPlayer(actorUuid);
         if (player == null) {
             return Optional.empty();
         }

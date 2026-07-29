@@ -1,4 +1,6 @@
+import java.io.File
 import java.net.URI
+import java.util.jar.JarFile
 import groovy.json.JsonSlurper
 import org.gradle.jvm.tasks.Jar
 
@@ -70,24 +72,38 @@ val downloadPaperServer by tasks.registering {
 
     doLast {
         val target = paperServerJar.get().asFile
-        if (!target.exists()) {
-            target.parentFile.mkdirs()
-
-            val apiUrl = "https://fill.papermc.io/v3/projects/paper/versions/$paperVersion/builds/latest"
-            val connection = URI(apiUrl).toURL().openConnection()
-            connection.setRequestProperty("User-Agent", "CustomContentEngine/0.1.0 (https://github.com/MaiconJh/customcontent-engine)")
-
-            val jsonResponse = connection.inputStream.bufferedReader().use { it.readText() }
-            val downloadUrl = extractDownloadUrl(jsonResponse)
-
-            println("Downloading Paper from: $downloadUrl")
-            URI(downloadUrl).toURL().openStream().use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
-            }
-            println("Downloaded Paper to: ${target.absolutePath}")
-        } else {
-            println("Paper jar already exists: ${target.absolutePath}")
+        if (target.exists() && isValidJar(target)) {
+            println("Paper jar already exists and is valid: ${target.absolutePath}")
+            return@doLast
         }
+
+        if (target.exists()) {
+            println("Existing Paper jar is invalid or corrupted; deleting: ${target.absolutePath}")
+            target.delete()
+        }
+
+        target.parentFile.mkdirs()
+
+        val apiUrl = "https://fill.papermc.io/v3/projects/paper/versions/$paperVersion/builds/$paperBuild"
+        val connection = URI(apiUrl).toURL().openConnection()
+        connection.setRequestProperty("User-Agent", "CustomContentEngine/0.1.0 (https://github.com/MaiconJh/customcontent-engine)")
+
+        val jsonResponse = connection.inputStream.bufferedReader().use { it.readText() }
+        val downloadUrl = extractDownloadUrl(jsonResponse)
+
+        println("Downloading Paper from: $downloadUrl")
+        URI(downloadUrl).toURL().openStream().use { input ->
+            target.outputStream().use { output -> input.copyTo(output) }
+        }
+        println("Downloaded Paper to: ${target.absolutePath}")
+    }
+}
+
+fun isValidJar(file: File): Boolean {
+    return try {
+        JarFile(file).use { true }
+    } catch (exception: Exception) {
+        false
     }
 }
 
@@ -120,6 +136,7 @@ tasks.register<Test>("integrationTest") {
     shouldRunAfter(tasks.test)
     dependsOn(tasks.named("integrationTestPluginJar"), downloadPaperServer)
     useJUnitPlatform()
+    maxParallelForks = 1
 
     doFirst {
         systemProperty("customcontent.pluginJar", tasks.named<Jar>("integrationTestPluginJar").get().archiveFile.get().asFile.absolutePath)
@@ -137,6 +154,8 @@ tasks.register<Test>("integrationTestSmoke") {
     useJUnitPlatform {
         includeTags("smoke", "mining", "mechanic")
     }
+    maxParallelForks = 1
+
     doFirst {
         systemProperty("customcontent.pluginJar", tasks.named<Jar>("integrationTestPluginJar").get().archiveFile.get().asFile.absolutePath)
         systemProperty("customcontent.paperJar", paperServerJar.get().asFile.absolutePath)
