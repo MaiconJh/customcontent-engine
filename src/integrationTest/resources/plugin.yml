@@ -26,6 +26,9 @@ commands:
   debugmine:
     description: Dev tool for integration tests – start mining a custom block.
     usage: /debugmine <toolId> <x> <y> <z> [world]
+  testprotection:
+    description: Test command to enable/disable protection.
+    usage: /testprotection <enable|disable> [minX]
   debugquery:
     description: Dev tool for integration tests – inspect a position.
     usage: /debugquery <x> <y> <z> [world]

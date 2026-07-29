@@ -32,6 +32,15 @@ class YamlDefinitionLoaderTest {
                 registry.mechanicBindings().mechanicIdsFor(
                         new CustomItemId("ruby_pickaxe"),
                         MechanicTrigger.ON_BLOCK_BREAK));
+        assertEquals(
+                List.of(new MechanicId("block_transform")),
+                registry.mechanicBindings().mechanicIdsFor(
+                        new CustomItemId("transform_tool"),
+                        MechanicTrigger.ON_BLOCK_BREAK));
+        var transformBinding = registry.mechanicBindings().bindingsFor(
+                new CustomItemId("transform_tool"),
+                MechanicTrigger.ON_BLOCK_BREAK).get(0);
+        assertEquals("1", transformBinding.arguments().get("to_block"));
     }
 
     @Test

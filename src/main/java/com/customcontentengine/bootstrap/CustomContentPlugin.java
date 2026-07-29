@@ -125,7 +125,9 @@ public class CustomContentPlugin extends JavaPlugin {
                 worldMutation,
                 cooldowns,
                 scheduler,
-                regionSafety);
+                regionSafety,
+                protectionPort);
+        System.out.println("[DEBUG] CustomContentPlugin protectionPort=" + protectionPort);
         AreaBreakEventTriggerService areaBreakEventTrigger = new AreaBreakEventTriggerService(
                 registry.mechanicBindings(),
                 AreaBreakMechanic.ID,

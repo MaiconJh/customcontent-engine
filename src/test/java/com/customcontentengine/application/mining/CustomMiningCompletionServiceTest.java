@@ -55,7 +55,7 @@ class CustomMiningCompletionServiceTest {
         assertEquals(List.of(TARGET), worldMutation.positions);
         assertEquals(List.of("AIR"), worldMutation.materials);
         assertEquals(List.of(TARGET), dropPort.positions);
-        verify(triggerService).trigger(TOOL_ID, TARGET, ACTOR_KEY);
+        verify(triggerService).trigger(TOOL_ID, TARGET, ACTOR_KEY, Map.of("origin_numeric_id", (short) 1));
     }
 
     @Test
@@ -125,7 +125,7 @@ class CustomMiningCompletionServiceTest {
         assertEquals(1, blockStore.removed.size());
         assertEquals(1, worldMutation.positions.size());
         assertEquals(1, dropPort.positions.size());
-        verify(triggerService).trigger(TOOL_ID, TARGET, ACTOR_KEY);
+        verify(triggerService).trigger(TOOL_ID, TARGET, ACTOR_KEY, Map.of("origin_numeric_id", (short) 1));
     }
 
     @Test

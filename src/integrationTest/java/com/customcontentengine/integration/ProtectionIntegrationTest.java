@@ -18,12 +18,6 @@ class ProtectionIntegrationTest extends BasePaperIntegrationTest {
     private static final WorldPosition VEIN_START = new WorldPosition("world", 30, 64, 30);
     private static final int PROTECTED_MIN_X = 32;
 
-    static {
-        setIntegrationTestSystemProperties(Map.of(
-                "customcontent.test.protection", "true",
-                "customcontent.test.protection.minX", String.valueOf(PROTECTED_MIN_X)));
-    }
-
     @Test
     void veinMinerSkipsProtectedBlocks() throws Exception {
         List<WorldPosition> vein = linearVein(VEIN_START, 5);
@@ -34,6 +28,7 @@ class ProtectionIntegrationTest extends BasePaperIntegrationTest {
             awaitBlockState(position, "6", "NOTE_BLOCK", Duration.ofSeconds(10));
         }
 
+        sendCommand("testprotection enable " + PROTECTED_MIN_X);
         mineBlock("vein_pickaxe", VEIN_START);
 
         WorldPosition firstUnprotected = vein.get(0);

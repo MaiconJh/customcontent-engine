@@ -16,10 +16,12 @@ public final class MechanicBindingValidator {
             Set.of(
                     Capability.BLOCK_QUERY,
                     Capability.BLOCK_MUTATION,
+                    Capability.BLOCK_PLACEMENT,
                     Capability.BUDGET_VIEW,
                     Capability.COOLDOWN_VIEW,
                     Capability.DROP_SINK,
-                    Capability.EXECUTION_ORIGIN));
+                    Capability.EXECUTION_ORIGIN,
+                    Capability.MECHANIC_CONFIG));
 
     private final MechanicRegistry mechanicRegistry;
     private final Set<MechanicId> allowedMechanicIds;

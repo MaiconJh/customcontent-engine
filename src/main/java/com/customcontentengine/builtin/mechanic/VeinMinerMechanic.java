@@ -97,8 +97,11 @@ public final class VeinMinerMechanic implements Mechanic {
             dropSink = context.require(DropSink.class);
             executionOrigin = context.require(ExecutionOrigin.class);
         } catch (IllegalArgumentException exception) {
+            System.out.println("[DEBUG] VeinMinerMechanic missing capability: " + exception.getMessage());
             return new MechanicResult.Rejected(exception.getMessage());
         }
+
+        System.out.println("[DEBUG] VeinMinerMechanic execute called");
 
         Optional<EnchantmentView> enchantmentView = context.optional(EnchantmentView.class);
         Optional<MechanicArguments> arguments = context.optional(MechanicArguments.class);
@@ -120,6 +123,12 @@ public final class VeinMinerMechanic implements Mechanic {
 
         WorldPosition origin = Objects.requireNonNull(executionOrigin.origin(), "origin");
         Optional<Short> originBlockId = blockQuery.findCustomBlockNumericId(origin);
+        System.out.println("[DEBUG] VeinMinerMechanic origin=" + origin + " queryResult=" + originBlockId + " args=" + arguments);
+        if (originBlockId.isEmpty()) {
+            originBlockId = arguments.flatMap(args -> args.get("origin_numeric_id"))
+                    .map(val -> ((Number) val).shortValue());
+            System.out.println("[DEBUG] VeinMinerMechanic fallback originBlockId=" + originBlockId);
+        }
 
         if (originBlockId.isEmpty()) {
             return new MechanicResult.Rejected("Origin block is not a custom block");
@@ -133,6 +142,7 @@ public final class VeinMinerMechanic implements Mechanic {
         boolean respectSilkTouch = resolveBoolean(arguments, "respect_silk_touch", defaultRespectSilkTouch);
 
         short veinBlockType = originBlockId.get();
+        System.out.println("[DEBUG] VeinMinerMechanic veinBlockType=" + veinBlockType + " maxBlocks=" + maxBlocks + " maxDepth=" + maxDepth + " allAdjacent=" + allAdjacent);
         Set<WorldPosition> visited = new HashSet<>();
         Deque<VeinNode> queue = new ArrayDeque<>();
         List<WorldPosition> remainingPositions = new ArrayList<>();
@@ -140,10 +150,16 @@ public final class VeinMinerMechanic implements Mechanic {
 
         visited.add(origin);
         queue.add(new VeinNode(origin, 0));
+        for (WorldPosition neighbor : adjacent(origin, allAdjacent)) {
+            if (visited.add(neighbor)) {
+                queue.add(new VeinNode(neighbor, 1));
+            }
+        }
 
         while (!queue.isEmpty()) {
             VeinNode node = queue.poll();
             WorldPosition position = node.position();
+            System.out.println("[DEBUG] VeinMinerMechanic BFS position=" + position + " depth=" + node.depth() + " budgetRemaining=" + budgetView);
 
             if (node.depth() > maxDepth) {
                 continue;
@@ -151,10 +167,13 @@ public final class VeinMinerMechanic implements Mechanic {
 
             Optional<Short> numericId = blockQuery.findCustomBlockNumericId(position);
             if (numericId.isEmpty() || numericId.get() != veinBlockType) {
+                System.out.println("[DEBUG] VeinMinerMechanic skip position=" + position + " numericId=" + numericId);
                 continue;
             }
 
+            System.out.println("[DEBUG] VeinMinerMechanic break position=" + position);
             if (!budgetView.tryConsume(position)) {
+                System.out.println("[DEBUG] VeinMinerMechanic budget exhausted at " + position);
                 remainingPositions.add(position);
                 while (!queue.isEmpty()) {
                     remainingPositions.add(queue.poll().position());

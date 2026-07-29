@@ -79,14 +79,16 @@ public final class PaperServer implements AutoCloseable {
         commands.add("-Xmx1G");
         commands.add("-XX:+TieredCompilation");
         commands.add("-XX:TieredStopAtLevel=1");
+        for (java.util.Map.Entry<String, String> entry : systemProperties.entrySet()) {
+            commands.add("-D" + entry.getKey() + "=" + entry.getValue());
+        }
         commands.add("-jar");
         commands.add(paperJar.toAbsolutePath().toString());
         commands.add("--nogui");
+        System.out.println("[DEBUG] PaperServer starting with commands: " + commands);
         ProcessBuilder builder = new ProcessBuilder(commands);
         builder.directory(serverDirectory.toFile());
         builder.redirectErrorStream(true);
-        java.util.Map<String, String> environment = builder.environment();
-        environment.putAll(systemProperties);
         return new PaperServer(builder.start());
     }
 

@@ -38,7 +38,8 @@ class MiningE2EIntegrationTest extends BasePaperIntegrationTest {
         awaitBlockState(TARGET, "none", "AIR", Duration.ofSeconds(60));
 
         server.clearOutput();
-        mineBlock("stone_pickaxe", TARGET);
+        sendCommand("debugmine stone_pickaxe " + TARGET.x() + " " + TARGET.y() + " " + TARGET.z() + " " + TARGET.worldName());
+        Thread.sleep(500);
         awaitBlockState(TARGET, "none", "AIR", Duration.ofSeconds(60));
         assertFalse(
                 outputContains("debugmine failed"),

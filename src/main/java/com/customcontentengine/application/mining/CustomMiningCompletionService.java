@@ -10,6 +10,7 @@ import com.customcontentengine.port.MiningCompletionPort;
 import com.customcontentengine.port.RegionSafetyPort;
 import com.customcontentengine.port.ToolWearPort;
 import com.customcontentengine.port.WorldMutationPort;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -69,11 +70,13 @@ public final class CustomMiningCompletionService implements MiningCompletionPort
                         "Region is not safe for mining completion.");
             }
 
+            short originNumericId = numericId.get();
             blockStore.remove(request.position());
             worldMutation.setBlockMaterial(request.position(), "AIR");
             dropPort.drop(request.position(), block.get().drops());
             applyToolWear(request.actorKey(), request.toolId());
-            mechanicTriggerService.trigger(request.toolId(), request.position(), request.actorKey());
+            Map<String, Object> extraArgs = Map.of("origin_numeric_id", originNumericId);
+            mechanicTriggerService.trigger(request.toolId(), request.position(), request.actorKey(), extraArgs);
             return new CompletionResult(CompletionStatus.SUCCESS, "Custom mining completed.");
         } catch (RuntimeException exception) {
             return new CompletionResult(

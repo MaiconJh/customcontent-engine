@@ -217,13 +217,11 @@ public final class VeinMinerRuntimeService {
     private BlockQuery blockQuery(RegionSafetyTracker safetyTracker, String actorKey) {
         BlockQuery delegate = new StoredBlockQuery(blockStore);
         return position -> {
-            if (!safetyTracker.canAccess(position)) {
-                return Optional.empty();
-            }
-            if (protectionPort != null && !protectionPort.canBuild(actorKey, position)) {
-                return Optional.empty();
-            }
-            return delegate.findCustomBlockNumericId(position);
+            boolean safe = safetyTracker.canAccess(position);
+            boolean canBuild = protectionPort == null || protectionPort.canBuild(actorKey, position);
+            Optional<Short> result = (safe && canBuild) ? delegate.findCustomBlockNumericId(position) : Optional.empty();
+            System.out.println("[DEBUG] VeinMinerRuntimeService blockQuery pos=" + position + " safe=" + safe + " canBuild=" + canBuild + " result=" + result);
+            return result;
         };
     }
 

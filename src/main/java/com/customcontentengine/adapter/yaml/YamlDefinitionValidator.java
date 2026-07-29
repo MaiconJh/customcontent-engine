@@ -3,6 +3,8 @@ package com.customcontentengine.adapter.yaml;
 import com.customcontentengine.domain.registry.DefinitionRegistry;
 import org.bukkit.configuration.ConfigurationSection;
 
+import java.util.Map;
+
 public final class YamlDefinitionValidator {
     public void validateRoot(ConfigurationSection root) {
         if (root == null) {
@@ -116,11 +118,25 @@ public final class YamlDefinitionValidator {
                     } else if (mechanicId instanceof java.util.Map<?, ?> mechanicEntry) {
                         Object rawId = mechanicEntry.get("id");
                         if (!(rawId instanceof String mechanicIdText) || mechanicIdText.isBlank()) {
-                            throw error("items." + id + ".mechanics." + trigger + "[" + index + "].id must be a non-empty string");
-                        }
-                        Object rawArguments = mechanicEntry.get("arguments");
-                        if (rawArguments != null && !(rawArguments instanceof java.util.Map<?, ?>)) {
-                            throw error("items." + id + ".mechanics." + trigger + "[" + index + "].arguments must be a map");
+                            if (mechanicEntry.isEmpty()) {
+                                throw error("items." + id + ".mechanics." + trigger + "[" + index + "] is missing mechanic id");
+                            }
+                            boolean hasNonBlankKey = mechanicEntry.keySet().stream()
+                                    .anyMatch(k -> k instanceof String key && !key.isBlank());
+                            if (!hasNonBlankKey) {
+                                throw error("items." + id + ".mechanics." + trigger + "[" + index + "] is missing mechanic id");
+                            }
+                            for (Map.Entry<?, ?> entry : mechanicEntry.entrySet()) {
+                                Object value = entry.getValue();
+                                if (value != null && !(value instanceof java.util.Map<?, ?>)) {
+                                    throw error("items." + id + ".mechanics." + trigger + "[" + index + "] arguments must be a map");
+                                }
+                            }
+                        } else {
+                            Object rawArguments = mechanicEntry.get("arguments");
+                            if (rawArguments != null && !(rawArguments instanceof java.util.Map<?, ?>)) {
+                                throw error("items." + id + ".mechanics." + trigger + "[" + index + "].arguments must be a map");
+                            }
                         }
                     } else {
                         throw error("items." + id + ".mechanics." + trigger + "[" + index + "] must be a non-empty string or a map with 'id'");

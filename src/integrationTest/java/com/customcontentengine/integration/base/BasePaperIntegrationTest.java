@@ -20,7 +20,7 @@ public abstract class BasePaperIntegrationTest {
 
     protected static PaperServer server;
     private static Path serverDirectory;
-    private static java.util.Map<String, String> integrationTestSystemProperties;
+    private static final ThreadLocal<java.util.Map<String, String>> integrationTestSystemProperties = new ThreadLocal<>();
     private static boolean serverStarting;
 
     @BeforeAll
@@ -34,7 +34,11 @@ public abstract class BasePaperIntegrationTest {
             Path paperJar = requiredPathProperty("customcontent.paperJar");
             serverDirectory = Files.createTempDirectory("customcontent-paper-it-");
             PaperServer.prepareServerDirectory(serverDirectory, pluginJar);
-            java.util.Map<String, String> properties = integrationTestSystemProperties != null ? integrationTestSystemProperties : new java.util.HashMap<>();
+            java.util.Map<String, String> properties = integrationTestSystemProperties.get();
+            if (properties == null) {
+                properties = new java.util.HashMap<>();
+            }
+            System.out.println("[DEBUG] BasePaperIntegrationTest class=" + BasePaperIntegrationTest.class.getName() + " identity=" + System.identityHashCode(BasePaperIntegrationTest.class) + " properties=" + properties);
         server = PaperServer.start(serverDirectory, paperJar, properties);
         server.awaitOutput(line -> line.contains("Done preparing level"), SERVER_START_TIMEOUT);
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -86,7 +90,7 @@ public abstract class BasePaperIntegrationTest {
     }
 
     protected static void setIntegrationTestSystemProperties(java.util.Map<String, String> properties) {
-        integrationTestSystemProperties = properties;
+        integrationTestSystemProperties.set(properties);
     }
 
     protected static Path serverDirectory() {

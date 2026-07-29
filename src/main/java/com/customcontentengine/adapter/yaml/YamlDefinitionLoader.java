@@ -208,6 +208,12 @@ public final class YamlDefinitionLoader {
             String key = mapEntry.getKey().toString();
             if (mechanicId == null) {
                 mechanicId = key;
+                Object value = mapEntry.getValue();
+                if (value instanceof Map<?, ?> argMap) {
+                    for (Map.Entry<?, ?> argEntry : argMap.entrySet()) {
+                        arguments.put(argEntry.getKey().toString(), argEntry.getValue());
+                    }
+                }
             } else {
                 arguments.put(key, mapEntry.getValue());
             }
